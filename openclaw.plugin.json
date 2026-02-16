@@ -1,0 +1,10 @@
+{
+  "id": "omni-llm",
+  "name": "OmniLLM",
+  "version": "1.0.0",
+  "description": "Multi-provider LLM router - OpenRouter, OpenAI, Anthropic, Google, xAI, DeepSeek, OpenCode and more",
+  "main": "dist/index.js",
+  "type": "module",
+  "keywords": ["openclaw", "llm", "router", "openai", "anthropic", "google", "opencode"],
+  "license": "MIT"
+}
