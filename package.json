@@ -1,12 +1,12 @@
 {
   "name": "omni-llm",
   "version": "1.0.0",
-  "description": "OpenClaw omni-provider for multi-platform messaging - Telegram, Discord, WhatsApp, Signal, Slack and more",
+  "description": "Multi-provider LLM router for OpenClaw - OpenRouter, OpenAI, Anthropic, Google, xAI, DeepSeek, OpenCode and more",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "omni-provider": "./dist/cli.js"
+    "omni-llm": "./dist/cli.js"
   },
   "openclaw": {
     "extensions": [
@@ -26,18 +26,24 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "openclaw",
-    "messaging",
-    "telegram",
-    "discord",
-    "whatsapp",
-    "signal",
-    "slack",
-    "omni",
-    "multi-platform"
+    "llm",
+    "router",
+    "openai",
+    "anthropic",
+    "google",
+    "opencode",
+    "multi-provider"
   ],
   "license": "MIT",
   "peerDependencies": {},
@@ -48,7 +54,9 @@
   },
   "devDependencies": {
     "tsup": "^8.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^20.0.0"
   },
   "engines": {
     "node": ">=20"
