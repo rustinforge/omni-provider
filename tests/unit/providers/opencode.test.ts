@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { OpenCodeProvider } from '../../src/providers/opencode.js';
+import { OpenCodeProvider } from '../../../src/providers/opencode.js';
 
 describe('OpenCodeProvider', () => {
   let provider: OpenCodeProvider;
