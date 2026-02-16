@@ -35,10 +35,10 @@ const plugin: OpenClawPluginDefinition = {
       return;
     }
 
-    const { providers: config } = loadProviderConfig(api.pluginConfig || {});
+    const { providers } = loadProviderConfig(api.pluginConfig || {});
     const apiKeys = loadApiKeysFromEnv();
 
-    const enabledProviders = Object.entries(config.providers)
+    const enabledProviders = Object.entries(providers)
       .filter(([_, cfg]) => cfg.enabled)
       .map(([provider]) => provider);
 
@@ -49,7 +49,7 @@ const plugin: OpenClawPluginDefinition = {
 
     api.logger.info(`OmniLLM initializing with providers: ${enabledProviders.join(", ")}`);
 
-    manager = new LLMProviderManager(api, config, apiKeys);
+    manager = new LLMProviderManager(api, providers, apiKeys);
 
     manager.registerAll()
       .then(() => {

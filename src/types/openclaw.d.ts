@@ -66,8 +66,20 @@ export interface ProviderConfig {
 }
 
 export interface ApiKeysConfig {
-  openai?: string;
-  anthropic?: string;
-  google?: string;
-  [key: string]: string | undefined;
+  openrouter?: { apiKey?: string };
+  openai?: { apiKey?: string };
+  anthropic?: { apiKey?: string };
+  google?: { apiKey?: string };
+  xai?: { apiKey?: string };
+  deepseek?: { apiKey?: string };
+  moonshot?: { apiKey?: string };
+  opencode?: { apiKey?: string };
+  azure?: { apiKey?: string; endpoint?: string };
+  anyscale?: { apiKey?: string };
+  together?: { apiKey?: string };
+  fireworks?: { apiKey?: string };
+  mistral?: { apiKey?: string };
+  cohere?: { apiKey?: string };
+  perplexity?: { apiKey?: string };
+  [key: string]: unknown;
 }

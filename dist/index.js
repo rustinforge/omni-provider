@@ -1545,7 +1545,7 @@ async function createStatsCommand() {
     acceptsArgs: true,
     requireAuth: false,
     handler: async (ctx) => {
-      return { text: "Stats command - implement with manager.getStats()" };
+      await ctx.reply("Stats command - implement with manager.getStats()");
     }
   };
 }
@@ -1557,13 +1557,13 @@ async function createProvidersCommand(manager2) {
     description: "Show configured LLM providers",
     acceptsArgs: false,
     requireAuth: false,
-    handler: async () => {
+    handler: async (context) => {
       const providers = manager2.getEnabledProviders();
       const lines = ["**OmniLLM Providers:**", ""];
       for (const p of providers) {
         lines.push(`\u2022 ${p}`);
       }
-      return { text: lines.join("\n") };
+      await context.reply(lines.join("\n"));
     }
   };
 }
@@ -1705,15 +1705,15 @@ var plugin = {
       api.logger.info("OmniLLM disabled (OMNI_LLM_DISABLED=true)");
       return;
     }
-    const { providers: config } = loadProviderConfig(api.pluginConfig || {});
+    const { providers } = loadProviderConfig(api.pluginConfig || {});
     const apiKeys = loadApiKeysFromEnv();
-    const enabledProviders = Object.entries(config.providers).filter(([_, cfg]) => cfg.enabled).map(([provider]) => provider);
+    const enabledProviders = Object.entries(providers).filter(([_, cfg]) => cfg.enabled).map(([provider]) => provider);
     if (enabledProviders.length === 0) {
       api.logger.warn("OmniLLM: No providers enabled! Configure at least one provider.");
       return;
     }
     api.logger.info(`OmniLLM initializing with providers: ${enabledProviders.join(", ")}`);
-    manager = new LLMProviderManager(api, config, apiKeys);
+    manager = new LLMProviderManager(api, providers, apiKeys);
     manager.registerAll().then(() => {
       api.logger.info(`OmniLLM ready - ${enabledProviders.length} provider(s) registered`);
     }).catch((err) => {

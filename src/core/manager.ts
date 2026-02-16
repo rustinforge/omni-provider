@@ -106,7 +106,7 @@ export class LLMProviderManager {
     }
 
     // Merge config with API keys
-    const mergedConfig: Record<string, unknown> = {
+    const mergedConfig: ProviderConfig = {
       ...providerConfig,
       ...(this.apiKeys[providerId] || {}),
     };
