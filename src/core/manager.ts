@@ -5,7 +5,7 @@
  * Handles initialization, routing, and request distribution.
  */
 
-import type { OpenClawPluginApi } from "openclaw";
+import type { OpenClawPluginApi } from "../types/openclaw.js";
 import type {
   LLMProvider,
   ProvidersConfig,
@@ -106,7 +106,7 @@ export class LLMProviderManager {
     }
 
     // Merge config with API keys
-    const mergedConfig = {
+    const mergedConfig: Record<string, unknown> = {
       ...providerConfig,
       ...(this.apiKeys[providerId] || {}),
     };

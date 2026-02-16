@@ -4,7 +4,7 @@
  * Supported models and aliases for OmniLLM.
  */
 
-import type { LLMProvider, ModelInfo, ModelAlias } from "../types.js";
+import type { LLMProvider, ModelInfo, ModelAlias } from "./types";
 
 /**
  * All supported models with their metadata

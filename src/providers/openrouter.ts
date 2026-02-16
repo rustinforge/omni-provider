@@ -4,7 +4,7 @@
  * OpenRouter meta-provider - routes to many models.
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types";
+import type { ChatCompletionRequest, ChatCompletionResponse } from "../types";
 import { BaseLLMProvider } from "./base";
 
 export class OpenRouterProvider extends BaseLLMProvider {

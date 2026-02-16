@@ -1,4 +1,4 @@
-import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types";
+import type { ChatCompletionRequest, ChatCompletionResponse } from "../types";
 import { BaseLLMProvider } from "./base";
 export class MistralProvider extends BaseLLMProvider {
   private baseUrl = 'https://api.mistral.ai/v1';

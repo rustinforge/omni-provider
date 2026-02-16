@@ -10,13 +10,14 @@ import type {
   OpenClawPluginApi,
   PluginCommandContext,
   OpenClawPluginCommandDefinition,
-} from "openclaw";
+} from "./types/openclaw.js";
 
 import { VERSION } from "./version.js";
 import { LLMProviderManager } from "./core/manager.js";
 import { createStatsCommand } from "./commands/stats.js";
 import { createProvidersCommand } from "./commands/providers.js";
-import { loadProviderConfig, loadApiKeysFromEnv, type ApiKeysConfig } from "./config/index.js";
+import { loadProviderConfig, loadApiKeysFromEnv } from "./config/index.js";
+import type { ApiKeysConfig } from "./types/openclaw.js";
 import { OPENCLAW_MODELS, MODEL_ALIASES } from "./models.js";
 
 let manager: LLMProviderManager | null = null;
@@ -97,4 +98,5 @@ export type {
   ChatCompletionResponse,
   RoutingDecision,
   RoutingTier,
+  ApiKeysConfig,
 } from "./types.js";

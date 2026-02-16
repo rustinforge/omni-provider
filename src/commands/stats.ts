@@ -1,4 +1,4 @@
-import type { OpenClawPluginCommandDefinition, PluginCommandContext } from "openclaw";
+import type { OpenClawPluginCommandDefinition, PluginCommandContext } from "../types/openclaw.js";
 
 export async function createStatsCommand(): Promise<OpenClawPluginCommandDefinition> {
   return {
@@ -7,7 +7,7 @@ export async function createStatsCommand(): Promise<OpenClawPluginCommandDefinit
     acceptsArgs: true,
     requireAuth: false,
     handler: async (ctx: PluginCommandContext) => {
-      return { text: "Stats command - implement with manager.getStats()" };
+      await ctx.reply("Stats command - implement with manager.getStats()");
     },
   };
 }

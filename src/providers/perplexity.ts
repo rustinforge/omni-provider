@@ -1,4 +1,4 @@
-import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types";
+import type { ChatCompletionRequest, ChatCompletionResponse } from "../types";
 import { BaseLLMProvider } from "./base";
 export class PerplexityProvider extends BaseLLMProvider {
   private baseUrl = 'https://api.perplexity.ai';

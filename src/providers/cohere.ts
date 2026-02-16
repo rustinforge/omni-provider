@@ -1,4 +1,4 @@
-import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types";
+import type { ChatCompletionRequest, ChatCompletionResponse } from "../types";
 import { BaseLLMProvider } from "./base";
 export class CohereProvider extends BaseLLMProvider {
   private baseUrl = 'https://api.cohere.ai/v1';

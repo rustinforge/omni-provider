@@ -2,7 +2,7 @@
  * OpenAI Provider
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types";
+import type { ChatCompletionRequest, ChatCompletionResponse } from "../types";
 import { BaseLLMProvider } from "./base";
 
 export class OpenAIProvider extends BaseLLMProvider {

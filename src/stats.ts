@@ -2,7 +2,7 @@
  * Stats Collector
  */
 
-import type { LLMProvider, ProviderStats, AggregatedStats } from "../types.js";
+import type { LLMProvider, ProviderStats, AggregatedStats } from "./types";
 
 export class StatsCollector {
   private stats: Map<LLMProvider, ProviderStats> = new Map();

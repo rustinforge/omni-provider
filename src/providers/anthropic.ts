@@ -2,7 +2,7 @@
  * Anthropic Provider
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types";
+import type { ChatCompletionRequest, ChatCompletionResponse } from "../types";
 import { BaseLLMProvider } from "./base";
 
 // Anthropic uses a different API format

@@ -5,7 +5,7 @@
  */
 
 import type { ChatCompletionRequest, LLMProvider, RoutingDecision, RoutingTier, ResolvedModel, ModelInfo } from "../types.js";
-import { LLMProviderManager } from "./manager";
+import { LLMProviderManager } from "../core/manager";
 import { getModel } from "../models.js";
 
 export class SmartRouter {

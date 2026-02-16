@@ -5,7 +5,7 @@
  * Supports Big Pickle, GPT-5 Nano, Kimi K2.5 Free, MiniMax M2.5 Free.
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse, Choice } from "../../types";
+import type { ChatCompletionRequest, ChatCompletionResponse, Choice } from "../types";
 import { BaseLLMProvider } from "./base";
 
 const OPENCODE_MODELS = ['big-pickle', 'gpt-5-nano', 'kimi-k2.5-free', 'minimax-m2.5-free'];

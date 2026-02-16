@@ -4,7 +4,7 @@
  * Abstract base class for all LLM providers.
  */
 
-import type { OpenClawPluginApi } from "openclaw";
+import type { OpenClawPluginApi } from "../types/openclaw.js";
 import type {
   LLMProvider,
   ProviderConfig,

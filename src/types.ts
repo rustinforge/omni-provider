@@ -4,7 +4,9 @@
  * Unified types for multi-provider LLM routing.
  */
 
-import type { OpenClawPluginApi } from "openclaw";
+import type { OpenClawPluginApi, ApiKeysConfig } from "./types/openclaw.js";
+
+export type { ApiKeysConfig };
 
 // ============================================
 // Provider Types
@@ -111,6 +113,15 @@ export interface ToolCall {
   function: {
     name: string;
     arguments: string;
+  };
+}
+
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
   };
 }
 
