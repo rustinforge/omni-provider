@@ -1,8 +1,7 @@
 /**
  * Moonshot Provider (Kimi)
  */
-
-import type { ChatCompletionRequest, ChatCompletionResponse } from "../types";
+import type { ChatCompletionRequest, ChatCompletionResponse, RawChatCompletionResponse, RawChoice } from "../types";
 import { BaseLLMProvider } from "./base";
 
 export class MoonshotProvider extends BaseLLMProvider {
@@ -43,18 +42,18 @@ export class MoonshotProvider extends BaseLLMProvider {
       throw new Error(`Moonshot API error: ${error.error?.message || response.statusText}`);
     }
 
-    const data = await response.json() as any;
-    
+    const data = await response.json() as RawChatCompletionResponse;
+
     return {
       id: data.id || this.generateId(),
       model: data.model || request.model,
-      choices: data.choices?.map((c: any) => ({
+      choices: data.choices?.map((c: RawChoice) => ({
         index: c.index || 0,
         message: {
-          role: c.message?.role || 'assistant',
+          role: (c.message?.role || 'assistant') as 'system' | 'user' | 'assistant' | 'tool',
           content: c.message?.content || '',
         },
-        finishReason: c.finish_reason || 'stop',
+        finishReason: (c.finish_reason || 'stop') as 'stop' | 'length' | 'tool_calls' | 'content_filter',
       })) || [],
       usage: data.usage ? {
         promptTokens: data.usage.prompt_tokens || 0,

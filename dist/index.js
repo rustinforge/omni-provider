@@ -836,7 +836,13 @@ var AnyscaleProvider = class extends BaseLLMProvider {
     const response = await fetch(`${this.getBaseUrl()}/chat/completions`, { method: "POST", headers: { "Authorization": `Bearer ${this.getApiKey()}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!response.ok) throw new Error(`Anyscale API error: ${response.statusText}`);
     const data = await response.json();
-    return { id: data.id || this.generateId(), model: data.model || request.model, choices: data.choices?.map((c) => ({ index: c.index || 0, message: { role: c.message?.role || "assistant", content: c.message?.content || "" }, finishReason: c.finish_reason || "stop" })) || [], usage: data.usage, created: Date.now() };
+    return {
+      id: data.id || this.generateId(),
+      model: data.model || request.model,
+      choices: data.choices?.map((c) => ({ index: c.index || 0, message: { role: c.message?.role || "assistant", content: c.message?.content || "" }, finishReason: c.finish_reason || "stop" })) || [],
+      usage: data.usage,
+      created: Date.now()
+    };
   }
 };
 
@@ -870,7 +876,7 @@ var FireworksProvider = class extends BaseLLMProvider {
     const response = await fetch(`${this.getBaseUrl()}/chat/completions`, { method: "POST", headers: { "Authorization": `Bearer ${this.getApiKey()}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!response.ok) throw new Error(`Fireworks API error: ${response.statusText}`);
     const data = await response.json();
-    return { id: data.id || this.generateId(), model: data.model || request.model, choices: data.choices?.map((c) => ({ index: c.index || 0, message: { role: c.message?.role || "assistant", content: c.message?.content || "" }, finishReason: c.finish_reason || "stop" })) || [], usage: data.usage, created: Date.now() };
+    return { id: data.id || this.generateId(), model: data.model || request.model, choices: data.choices?.map((c) => ({ index: c.index || 0, message: { role: c.message?.role || "assistant", content: c.message?.content || "" }, finishReason: c.finish_reason || "stop" })) || [], usage: data.usage ? { promptTokens: data.usage.prompt_tokens || 0, completionTokens: data.usage.completion_tokens || 0, totalTokens: data.usage.total_tokens || 0 } : void 0, created: Date.now() };
   }
 };
 
@@ -934,6 +940,114 @@ var PerplexityProvider = class extends BaseLLMProvider {
     if (!response.ok) throw new Error(`Perplexity API error: ${response.statusText}`);
     const data = await response.json();
     return { id: data.id || this.generateId(), model: data.model || request.model, choices: data.choices?.map((c) => ({ index: c.index || 0, message: { role: c.message?.role || "assistant", content: c.message?.content || "" }, finishReason: c.finish_reason || "stop" })) || [], usage: data.usage, created: Date.now() };
+  }
+};
+
+// src/providers/nvidia.ts
+var NVIDIAProvider = class extends BaseLLMProvider {
+  baseUrl = "https://integrate.api.nvidia.com/v1";
+  constructor() {
+    super();
+    this.provider = "nvidia";
+    this.name = "NVIDIA Build";
+  }
+  getDefaultBaseUrl() {
+    return this.baseUrl;
+  }
+  async complete(request) {
+    this.ensureInitialized();
+    const body = {
+      model: request.model,
+      messages: request.messages,
+      temperature: request.temperature,
+      max_tokens: request.maxTokens,
+      top_p: request.topP,
+      stream: false
+    };
+    if (request.tools) body.tools = request.tools;
+    if (request.toolChoice) body.tool_choice = request.toolChoice;
+    if (request.responseFormat) body.response_format = request.responseFormat;
+    const response = await fetch(`${this.getBaseUrl()}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${this.getApiKey()}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(`NVIDIA API error: ${error.error?.message || response.statusText}`);
+    }
+    const data = await response.json();
+    return {
+      id: data.id || this.generateId(),
+      model: data.model || request.model,
+      choices: data.choices?.map((c) => ({
+        index: c.index || 0,
+        message: {
+          role: c.message?.role || "assistant",
+          content: c.message?.content || "",
+          toolCalls: c.message?.tool_calls
+        },
+        finishReason: c.finish_reason || "stop"
+      })) || [],
+      usage: data.usage ? {
+        promptTokens: data.usage.prompt_tokens || 0,
+        completionTokens: data.usage.completion_tokens || 0,
+        totalTokens: data.usage.total_tokens || 0
+      } : void 0,
+      created: data.created || Date.now()
+    };
+  }
+  async *stream(request) {
+    this.ensureInitialized();
+    const body = {
+      model: request.model,
+      messages: request.messages,
+      temperature: request.temperature,
+      max_tokens: request.maxTokens,
+      stream: true
+    };
+    const response = await fetch(`${this.getBaseUrl()}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${this.getApiKey()}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      throw new Error(`NVIDIA API error: ${response.statusText}`);
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body");
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data: ")) continue;
+        if (trimmed === "data: [DONE]") return;
+        try {
+          const data = JSON.parse(trimmed.slice(6));
+          yield {
+            id: data.id,
+            choices: [{
+              index: 0,
+              delta: data.choices?.[0]?.delta || {},
+              finishReason: data.choices?.[0]?.finish_reason
+            }]
+          };
+        } catch {
+        }
+      }
+    }
   }
 };
 
@@ -1261,6 +1375,35 @@ var MODELS = {
     contextWindow: 128e3,
     maxOutputTokens: 32e3,
     capabilities: { streaming: true, functionCalling: true }
+  },
+  // NVIDIA Build (NIM endpoints)
+  "z-ai/glm5": {
+    id: "z-ai/glm5",
+    name: "GLM-5",
+    provider: "nvidia",
+    contextWindow: 128e3,
+    maxOutputTokens: 4096,
+    capabilities: { streaming: true, functionCalling: true },
+    pricing: { input: 0, output: 0 }
+    // Free tier available
+  },
+  "nvidia/llama-3.1-nemotron-70b-instruct": {
+    id: "nvidia/llama-3.1-nemotron-70b-instruct",
+    name: "Nemotron 70B",
+    provider: "nvidia",
+    contextWindow: 128e3,
+    maxOutputTokens: 4096,
+    capabilities: { streaming: true, functionCalling: true },
+    pricing: { input: 0, output: 0 }
+  },
+  "nvidia/mistral-large": {
+    id: "nvidia/mistral-large",
+    name: "Mistral Large (NVIDIA)",
+    provider: "nvidia",
+    contextWindow: 128e3,
+    maxOutputTokens: 4096,
+    capabilities: { streaming: true, functionCalling: true },
+    pricing: { input: 0, output: 0 }
   }
 };
 var MODEL_ALIASES = [
@@ -1279,7 +1422,9 @@ var MODEL_ALIASES = [
   { alias: "big-pickle", model: "big-pickle", provider: "opencode" },
   { alias: "gpt-nano", model: "gpt-5-nano", provider: "opencode" },
   { alias: "reasoner", model: "o3-mini" },
-  { alias: "reasoning", model: "o3" }
+  { alias: "reasoning", model: "o3" },
+  { alias: "glm5", model: "z-ai/glm5" },
+  { alias: "nemotron", model: "nvidia/llama-3.1-nemotron-70b-instruct" }
 ];
 function getModel(modelId) {
   return MODELS[modelId];
@@ -1287,6 +1432,12 @@ function getModel(modelId) {
 function resolveModelAlias(alias) {
   const found = MODEL_ALIASES.find((a) => a.alias === alias);
   return found?.model || alias;
+}
+function getModelsByProvider(provider) {
+  return Object.values(MODELS).filter((m) => m.provider === provider);
+}
+function getFreeModels() {
+  return Object.values(MODELS).filter((m) => m.pricing?.input === 0);
 }
 
 // src/core/manager.ts
@@ -1305,7 +1456,8 @@ var PROVIDER_CLASSES = {
   fireworks: FireworksProvider,
   mistral: MistralProvider,
   cohere: CohereProvider,
-  perplexity: PerplexityProvider
+  perplexity: PerplexityProvider,
+  nvidia: NVIDIAProvider
 };
 var LLMProviderManager = class {
   api;
@@ -1746,6 +1898,12 @@ var index_default = plugin;
 export {
   BaseLLMProvider,
   LLMProviderManager,
-  index_default as default
+  MODELS,
+  MODEL_ALIASES,
+  index_default as default,
+  getFreeModels,
+  getModel,
+  getModelsByProvider,
+  resolveModelAlias
 };
 //# sourceMappingURL=index.js.map

@@ -88,6 +88,7 @@ export default plugin;
 
 export { LLMProviderManager } from "./core/manager.js";
 export { BaseLLMProvider } from "./providers/base.js";
+export { getModel, getFreeModels, getModelsByProvider, resolveModelAlias, MODELS, MODEL_ALIASES } from "./models.js";
 export type {
   LLMProvider,
   ProviderConfig,

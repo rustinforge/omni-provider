@@ -1,16 +1,18 @@
 /**
- * OpenAI Provider
+ * NVIDIA Build Provider
+ * OpenAI-compatible API for NVIDIA NIM endpoints
+ * Base URL: https://integrate.api.nvidia.com/v1
  */
 import type { ChatCompletionRequest, ChatCompletionResponse, RawChatCompletionResponse, RawChoice, StreamChunk } from "../types";
 import { BaseLLMProvider } from "./base";
 
-export class OpenAIProvider extends BaseLLMProvider {
-  private baseUrl = 'https://api.openai.com/v1';
+export class NVIDIAProvider extends BaseLLMProvider {
+  private baseUrl = 'https://integrate.api.nvidia.com/v1';
 
   constructor() {
     super();
-    this.provider = 'openai';
-    this.name = 'OpenAI';
+    this.provider = 'nvidia';
+    this.name = 'NVIDIA Build';
   }
 
   protected getDefaultBaseUrl(): string {
@@ -26,16 +28,12 @@ export class OpenAIProvider extends BaseLLMProvider {
       temperature: request.temperature,
       max_tokens: request.maxTokens,
       top_p: request.topP,
-      presence_penalty: request.presencePenalty,
-      frequency_penalty: request.frequencyPenalty,
-      logprobs: request.logprobs,
       stream: false,
     };
 
     if (request.tools) body.tools = request.tools;
     if (request.toolChoice) body.tool_choice = request.toolChoice;
     if (request.responseFormat) body.response_format = request.responseFormat;
-    if (request.reasoning) body.reasoning_effort = request.reasoning.effort;
 
     const response = await fetch(`${this.getBaseUrl()}/chat/completions`, {
       method: 'POST',
@@ -48,7 +46,7 @@ export class OpenAIProvider extends BaseLLMProvider {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(`OpenAI API error: ${error.error?.message || response.statusText}`);
+      throw new Error(`NVIDIA API error: ${error.error?.message || response.statusText}`);
     }
 
     const data = await response.json() as RawChatCompletionResponse;
@@ -95,7 +93,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
+      throw new Error(`NVIDIA API error: ${response.statusText}`);
     }
 
     const reader = response.body?.getReader();
@@ -127,7 +125,7 @@ export class OpenAIProvider extends BaseLLMProvider {
               finishReason: data.choices?.[0]?.finish_reason,
             }],
           };
-        } catch { /* ignore */ }
+        } catch { /* ignore parse errors */ }
       }
     }
   }

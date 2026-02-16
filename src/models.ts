@@ -222,6 +222,35 @@ export const MODELS: Record<string, ModelInfo> = {
     maxOutputTokens: 32000,
     capabilities: { streaming: true, functionCalling: true },
   },
+  
+  // NVIDIA Build (NIM endpoints)
+  'z-ai/glm5': {
+    id: 'z-ai/glm5',
+    name: 'GLM-5',
+    provider: 'nvidia',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    capabilities: { streaming: true, functionCalling: true },
+    pricing: { input: 0.0, output: 0.0 }, // Free tier available
+  },
+  'nvidia/llama-3.1-nemotron-70b-instruct': {
+    id: 'nvidia/llama-3.1-nemotron-70b-instruct',
+    name: 'Nemotron 70B',
+    provider: 'nvidia',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    capabilities: { streaming: true, functionCalling: true },
+    pricing: { input: 0.0, output: 0.0 },
+  },
+  'nvidia/mistral-large': {
+    id: 'nvidia/mistral-large',
+    name: 'Mistral Large (NVIDIA)',
+    provider: 'nvidia',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    capabilities: { streaming: true, functionCalling: true },
+    pricing: { input: 0.0, output: 0.0 },
+  },
 };
 
 /**
@@ -244,6 +273,8 @@ export const MODEL_ALIASES: ModelAlias[] = [
   { alias: 'gpt-nano', model: 'gpt-5-nano', provider: 'opencode' },
   { alias: 'reasoner', model: 'o3-mini' },
   { alias: 'reasoning', model: 'o3' },
+  { alias: 'glm5', model: 'z-ai/glm5' },
+  { alias: 'nemotron', model: 'nvidia/llama-3.1-nemotron-70b-instruct' },
 ];
 
 /**

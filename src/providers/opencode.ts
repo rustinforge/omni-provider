@@ -37,6 +37,7 @@ export class OpenCodeProvider extends BaseLLMProvider {
       messages: request.messages,
       temperature: request.temperature,
       max_tokens: request.maxTokens,
+      top_p: request.topP,
       stream: false,
     };
 
@@ -95,6 +96,7 @@ export class OpenCodeProvider extends BaseLLMProvider {
       messages: request.messages,
       temperature: request.temperature,
       max_tokens: request.maxTokens,
+      top_p: request.topP,
       stream: true,
     };
 

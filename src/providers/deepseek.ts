@@ -2,7 +2,7 @@
  * DeepSeek Provider
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse } from "../types";
+import type { ChatCompletionRequest, ChatCompletionResponse, ChatMessage, RawChatCompletionResponse, RawChoice } from "../types";
 import { BaseLLMProvider } from "./base";
 
 export class DeepSeekProvider extends BaseLLMProvider {
@@ -43,18 +43,18 @@ export class DeepSeekProvider extends BaseLLMProvider {
       throw new Error(`DeepSeek API error: ${error.error?.message || response.statusText}`);
     }
 
-    const data = await response.json() as any;
+    const data = await response.json() as RawChatCompletionResponse;
     
     return {
       id: data.id || this.generateId(),
       model: data.model || request.model,
-      choices: data.choices?.map((c: any) => ({
+      choices: data.choices?.map((c: RawChoice) => ({
         index: c.index || 0,
         message: {
-          role: c.message?.role || 'assistant',
+          role: (c.message?.role as ChatMessage['role']) || 'assistant',
           content: c.message?.content || '',
         },
-        finishReason: c.finish_reason || 'stop',
+        finishReason: (c.finish_reason as ChatCompletionResponse['choices'][0]['finishReason']) || 'stop',
       })) || [],
       usage: data.usage ? {
         promptTokens: data.usage.prompt_tokens || 0,

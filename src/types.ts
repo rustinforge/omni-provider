@@ -1,6 +1,6 @@
 /**
  * OmniLLM - Types
- * 
+ *
  * Unified types for multi-provider LLM routing.
  */
 
@@ -13,12 +13,12 @@ export type { ApiKeysConfig };
 // ============================================
 
 export type LLMProvider = 
-  | 'openrouter' 
-  | 'openai' 
-  | 'anthropic' 
-  | 'google' 
-  | 'xai' 
-  | 'deepseek' 
+  | 'openrouter'
+  | 'openai'
+  | 'anthropic'
+  | 'google'
+  | 'xai'
+  | 'deepseek'
   | 'moonshot'
   | 'opencode'
   | 'azure'
@@ -27,7 +27,8 @@ export type LLMProvider =
   | 'fireworks'
   | 'mistral'
   | 'cohere'
-  | 'perplexity';
+  | 'perplexity'
+  | 'nvidia';
 
 export interface ProviderConfig {
   enabled: boolean;
@@ -64,6 +65,7 @@ export interface ProvidersConfig {
   mistral?: ProviderConfig;
   cohere?: ProviderConfig;
   perplexity?: ProviderConfig;
+  nvidia?: ProviderConfig;
 }
 
 // ============================================
@@ -96,6 +98,70 @@ export interface ResolvedModel {
 }
 
 // ============================================
+// Raw API Response Types (for parsing provider responses)
+// ============================================
+
+/** OpenAI-compatible chat completion response from API */
+export interface RawChatCompletionResponse {
+  id?: string;
+  model?: string;
+  choices?: RawChoice[];
+  usage?: RawUsage;
+  created?: number;
+  [key: string]: unknown;
+}
+
+/** Raw choice from API response */
+export interface RawChoice {
+  index?: number;
+  message?: RawMessage;
+  finish_reason?: string;
+  delta?: RawDelta;
+}
+
+/** Raw message from API response */
+export interface RawMessage {
+  role?: string;
+  content?: string;
+  tool_calls?: RawToolCall[];
+}
+
+/** Raw delta for streaming */
+export interface RawDelta {
+  role?: string;
+  content?: string;
+  tool_calls?: RawToolCall[];
+}
+
+/** Raw tool call from API */
+export interface RawToolCall {
+  id?: string;
+  type?: string;
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
+}
+
+/** Raw usage from API response */
+export interface RawUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
+/** Raw streaming chunk from API */
+export interface RawStreamChunk {
+  id?: string;
+  choices?: Array<{
+    index?: number;
+    delta?: RawDelta;
+    finish_reason?: string;
+  }>;
+  [key: string]: unknown;
+}
+
+// ============================================
 // Request/Response Types
 // ============================================
 
@@ -103,7 +169,7 @@ export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   name?: string;
-  toolCalls?: ToolCall[];
+  toolCalls?: ToolCall[] | RawToolCall[];
   toolCallId?: string;
 }
 
@@ -136,6 +202,10 @@ export interface ChatCompletionRequest {
   toolChoice?: string | { type: 'function'; function: { name: string } };
   responseFormat?: { type: 'json_object' };
   reasoning?: { effort: 'low' | 'medium' | 'high' };
+  // OpenAI-specific options
+  presencePenalty?: number;
+  frequencyPenalty?: number;
+  logprobs?: boolean;
 }
 
 export interface ChatCompletionResponse {

@@ -38,6 +38,7 @@ import { FireworksProvider } from "../providers/fireworks";
 import { MistralProvider } from "../providers/mistral";
 import { CohereProvider } from "../providers/cohere";
 import { PerplexityProvider } from "../providers/perplexity";
+import { NVIDIAProvider } from "../providers/nvidia";
 import { SmartRouter } from "../router/smart-router";
 import { StatsCollector } from "../stats.js";
 import { resolveModelAlias, getModel } from "../models.js";
@@ -58,6 +59,7 @@ const PROVIDER_CLASSES: Record<LLMProvider, new () => BaseLLMProvider> = {
   mistral: MistralProvider,
   cohere: CohereProvider,
   perplexity: PerplexityProvider,
+  nvidia: NVIDIAProvider,
 };
 
 export class LLMProviderManager {
