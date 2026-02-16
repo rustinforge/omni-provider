@@ -3,6 +3,11 @@ import { BaseLLMProvider } from "./base";
 export class CohereProvider extends BaseLLMProvider {
   private baseUrl = 'https://api.cohere.ai/v1';
   protected getDefaultBaseUrl(): string { return this.baseUrl; }
+  constructor() {
+    super();
+    this.provider = 'cohere';
+    this.name = 'Cohere';
+  }
   async complete(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
     this.ensureInitialized();
     const body: Record<string, unknown> = { model: request.model, messages: request.messages, temperature: request.temperature, max_tokens: request.maxTokens, stream: false };

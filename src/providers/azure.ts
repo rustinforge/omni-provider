@@ -6,6 +6,7 @@ import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types"
 import { BaseLLMProvider } from "./base";
 
 export class AzureProvider extends BaseLLMProvider {
+  name = 'Azure';
   protected getDefaultBaseUrl(): string {
     return this.config.baseUrl || '';
   }

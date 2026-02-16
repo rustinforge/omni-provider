@@ -1,6 +1,7 @@
 import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types";
 import { BaseLLMProvider } from "./base";
 export class TogetherProvider extends BaseLLMProvider {
+  name = 'Together';
   private baseUrl = 'https://api.together.xyz/v1';
   protected getDefaultBaseUrl(): string { return this.baseUrl; }
   async complete(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {

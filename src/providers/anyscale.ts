@@ -2,6 +2,7 @@ import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types"
 import { BaseLLMProvider } from "./base";
 
 export class AnyscaleProvider extends BaseLLMProvider {
+  name = 'Anyscale';
   private baseUrl = 'https://api.endpoints.anyscale.com/v1';
   protected getDefaultBaseUrl(): string { return this.baseUrl; }
   async complete(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {

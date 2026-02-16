@@ -1,6 +1,7 @@
 import type { ChatCompletionRequest, ChatCompletionResponse } from "../../types";
 import { BaseLLMProvider } from "./base";
 export class FireworksProvider extends BaseLLMProvider {
+  name = 'Fireworks';
   private baseUrl = 'https://api.fireworks.ai/inference/v1';
   protected getDefaultBaseUrl(): string { return this.baseUrl; }
   async complete(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {

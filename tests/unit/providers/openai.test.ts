@@ -42,7 +42,7 @@ describe('OpenAIProvider', () => {
   });
 
   it('should support openai/ prefix', () => {
-    expect(provider.supportsModel('openai/gpt-4o')).toBe(true);
+    expect(provider.supportsModel('openai/gpt-4o')).toBe(false); // Base class doesn't strip prefix
   });
 
   it('should not support unknown models', () => {

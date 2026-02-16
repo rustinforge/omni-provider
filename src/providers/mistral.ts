@@ -3,6 +3,11 @@ import { BaseLLMProvider } from "./base";
 export class MistralProvider extends BaseLLMProvider {
   private baseUrl = 'https://api.mistral.ai/v1';
   protected getDefaultBaseUrl(): string { return this.baseUrl; }
+  constructor() {
+    super();
+    this.provider = 'mistral';
+    this.name = 'Mistral';
+  }
   async complete(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
     this.ensureInitialized();
     const body: Record<string, unknown> = { model: request.model, messages: request.messages, temperature: request.temperature, max_tokens: request.maxTokens, stream: false };

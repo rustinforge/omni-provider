@@ -782,6 +782,7 @@ var OpenCodeProvider = class extends BaseLLMProvider {
 
 // src/providers/azure.ts
 var AzureProvider = class extends BaseLLMProvider {
+  name = "Azure";
   getDefaultBaseUrl() {
     return this.config.baseUrl || "";
   }
@@ -824,6 +825,7 @@ var AzureProvider = class extends BaseLLMProvider {
 
 // src/providers/anyscale.ts
 var AnyscaleProvider = class extends BaseLLMProvider {
+  name = "Anyscale";
   baseUrl = "https://api.endpoints.anyscale.com/v1";
   getDefaultBaseUrl() {
     return this.baseUrl;
@@ -840,6 +842,7 @@ var AnyscaleProvider = class extends BaseLLMProvider {
 
 // src/providers/together.ts
 var TogetherProvider = class extends BaseLLMProvider {
+  name = "Together";
   baseUrl = "https://api.together.xyz/v1";
   getDefaultBaseUrl() {
     return this.baseUrl;
@@ -856,6 +859,7 @@ var TogetherProvider = class extends BaseLLMProvider {
 
 // src/providers/fireworks.ts
 var FireworksProvider = class extends BaseLLMProvider {
+  name = "Fireworks";
   baseUrl = "https://api.fireworks.ai/inference/v1";
   getDefaultBaseUrl() {
     return this.baseUrl;
@@ -876,6 +880,11 @@ var MistralProvider = class extends BaseLLMProvider {
   getDefaultBaseUrl() {
     return this.baseUrl;
   }
+  constructor() {
+    super();
+    this.provider = "mistral";
+    this.name = "Mistral";
+  }
   async complete(request) {
     this.ensureInitialized();
     const body = { model: request.model, messages: request.messages, temperature: request.temperature, max_tokens: request.maxTokens, stream: false };
@@ -892,6 +901,11 @@ var CohereProvider = class extends BaseLLMProvider {
   getDefaultBaseUrl() {
     return this.baseUrl;
   }
+  constructor() {
+    super();
+    this.provider = "cohere";
+    this.name = "Cohere";
+  }
   async complete(request) {
     this.ensureInitialized();
     const body = { model: request.model, messages: request.messages, temperature: request.temperature, max_tokens: request.maxTokens, stream: false };
@@ -907,6 +921,11 @@ var PerplexityProvider = class extends BaseLLMProvider {
   baseUrl = "https://api.perplexity.ai";
   getDefaultBaseUrl() {
     return this.baseUrl;
+  }
+  constructor() {
+    super();
+    this.provider = "perplexity";
+    this.name = "Perplexity";
   }
   async complete(request) {
     this.ensureInitialized();
