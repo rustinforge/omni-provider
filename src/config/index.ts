@@ -6,6 +6,68 @@
 
 import type { ProvidersConfig, ProviderConfig, LLMProvider } from "../types.js";
 
+/**
+ * Validate provider configuration
+ */
+export function validateConfig(config: ProvidersConfig): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  for (const [provider, cfg] of Object.entries(config)) {
+    if (cfg.enabled && !cfg.apiKey) {
+      errors.push(`Provider ${provider} is enabled but missing API key`);
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Merge two provider configs
+ */
+export function mergeConfigs(base: ProvidersConfig, override: ProvidersConfig): ProvidersConfig {
+  return {
+    ...base,
+    ...override,
+  };
+}
+
+/**
+ * Load config from env vars (test helper)
+ */
+export function loadConfig(env: Record<string, string | undefined>): ProvidersConfig {
+  const originalEnv = process.env;
+  // @ts-ignore - temporarily replace env
+  process.env = { ...originalEnv, ...env };
+  
+  const defaultConfig: ProvidersConfig = {
+    openrouter: { enabled: false },
+    openai: { enabled: false },
+    anthropic: { enabled: false },
+    google: { enabled: false },
+    xai: { enabled: false },
+    deepseek: { enabled: false },
+    moonshot: { enabled: false },
+    opencode: { enabled: false },
+    azure: { enabled: false },
+    anyscale: { enabled: false },
+    together: { enabled: false },
+    fireworks: { enabled: false },
+    mistral: { enabled: false },
+    cohere: { enabled: false },
+    perplexity: { enabled: false },
+  };
+  
+  const config = applyEnvOverrides(defaultConfig);
+  
+  // Restore original env
+  process.env = originalEnv;
+  
+  return config;
+}
+
 export interface ApiKeysConfig {
   openrouter?: { apiKey?: string };
   openai?: { apiKey?: string };

@@ -2,24 +2,43 @@
  * Routing Integration Tests
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SmartRouter } from '../../src/router/smart-router.js';
 import { LLMProviderManager } from '../../src/core/manager.js';
+
+// Mock OpenClawPluginApi
+const createMockApi = () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  pluginConfig: {},
+  registerCommand: vi.fn(),
+  registerService: vi.fn(),
+});
 
 describe('Routing Integration', () => {
   let manager: LLMProviderManager;
   let router: SmartRouter;
 
-  beforeEach(() => {
-    manager = new LLMProviderManager({
-      opencode: { enabled: true, apiKey: 'test-key' },
-      openai: { enabled: true, apiKey: 'test-key' },
-      anthropic: { enabled: true, apiKey: 'test-key' },
-      google: { enabled: true, apiKey: 'test-key' },
-      deepseek: { enabled: true, apiKey: 'test-key' },
-      xai: { enabled: true, apiKey: 'test-key' },
-      openrouter: { enabled: true, apiKey: 'test-key' },
-    });
+  const mockApi = createMockApi();
+
+  beforeEach(async () => {
+    manager = new LLMProviderManager(
+      mockApi,
+      {
+        opencode: { enabled: true, apiKey: 'test-key' },
+        openai: { enabled: true, apiKey: 'test-key' },
+        anthropic: { enabled: true, apiKey: 'test-key' },
+        google: { enabled: true, apiKey: 'test-key' },
+        deepseek: { enabled: true, apiKey: 'test-key' },
+        xai: { enabled: true, apiKey: 'test-key' },
+        openrouter: { enabled: true, apiKey: 'test-key' },
+      },
+      {}
+    );
+    await manager.registerAll();
     router = new SmartRouter(manager);
   });
 
@@ -72,33 +91,49 @@ describe('Routing Integration', () => {
 });
 
 describe('Provider Availability', () => {
-  let manager: LLMProviderManager;
+  const mockApi = createMockApi();
 
-  it('should report opencode as available when enabled', () => {
-    manager = new LLMProviderManager({
-      opencode: { enabled: true, apiKey: 'test' },
-    });
+  it('should report opencode as available when enabled', async () => {
+    const manager = new LLMProviderManager(
+      mockApi,
+      {
+        opencode: { enabled: true, apiKey: 'test' },
+      },
+      {}
+    );
+    await manager.registerAll();
     expect(manager.isProviderAvailable('opencode')).toBe(true);
   });
 
-  it('should report provider as unavailable when disabled', () => {
-    manager = new LLMProviderManager({
-      opencode: { enabled: false, apiKey: 'test' },
-    });
+  it('should report provider as unavailable when disabled', async () => {
+    const manager = new LLMProviderManager(
+      mockApi,
+      {
+        opencode: { enabled: false, apiKey: 'test' },
+      },
+      {}
+    );
+    await manager.registerAll();
     expect(manager.isProviderAvailable('opencode')).toBe(false);
   });
 
-  it('should report provider as unavailable when no config', () => {
-    manager = new LLMProviderManager({});
+  it('should report provider as unavailable when no config', async () => {
+    const manager = new LLMProviderManager(mockApi, {}, {});
+    await manager.registerAll();
     expect(manager.isProviderAvailable('opencode')).toBe(false);
   });
 
-  it('should get list of enabled providers', () => {
-    manager = new LLMProviderManager({
-      opencode: { enabled: true, apiKey: 'test' },
-      openai: { enabled: true, apiKey: 'test' },
-      anthropic: { enabled: false, apiKey: 'test' },
-    });
+  it('should get list of enabled providers', async () => {
+    const manager = new LLMProviderManager(
+      mockApi,
+      {
+        opencode: { enabled: true, apiKey: 'test' },
+        openai: { enabled: true, apiKey: 'test' },
+        anthropic: { enabled: false, apiKey: 'test' },
+      },
+      {}
+    );
+    await manager.registerAll();
     const providers = manager.getEnabledProviders();
     expect(providers).toContain('opencode');
     expect(providers).toContain('openai');
