@@ -1,4 +1,4 @@
-import type { OpenClawPluginCommandDefinition, PluginCommandContext } from "openclaw";
+import type { OpenClawPluginCommandDefinition } from "openclaw";
 import type { LLMProviderManager } from "../core/manager";
 
 export async function createProvidersCommand(manager: LLMProviderManager): Promise<OpenClawPluginCommandDefinition> {

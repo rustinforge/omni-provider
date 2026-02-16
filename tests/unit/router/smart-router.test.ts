@@ -107,13 +107,13 @@ describe('SmartRouter', () => {
     }
   });
 
-  it('should throw error when no providers available', () => {
+  it('should throw error when no providers available', async () => {
     const emptyManager = {
       isProviderAvailable: vi.fn().mockReturnValue(false),
       getEnabledProviders: vi.fn().mockReturnValue([]),
     };
     const emptyRouter = new SmartRouter(emptyManager as any);
     
-    expect(emptyRouter.routeAuto()).rejects.toThrow('No LLM providers configured');
+    await expect(emptyRouter.routeAuto()).rejects.toThrow('No LLM providers configured');
   });
 });
