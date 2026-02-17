@@ -512,11 +512,400 @@ function formatStatsAscii(stats) {
   return lines.join("\n");
 }
 
+// src/proxy.ts
+import { createServer } from "http";
+var DEFAULT_PORT2 = 8403;
+var HEALTH_CHECK_TIMEOUT_MS = 2e3;
+var PROVIDER_URLS = {
+  openrouter: "https://openrouter.ai/api/v1",
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta",
+  xai: "https://api.x.ai/v1",
+  deepseek: "https://api.deepseek.com/v1",
+  moonshot: "https://api.moonshot.cn/v1",
+  opencode: "https://opencode.ai/zen/v1",
+  azure: "",
+  anyscale: "https://api.endpoints.anyscale.com/v1",
+  together: "https://api.together.xyz/v1",
+  fireworks: "https://api.fireworks.ai/inference/v1",
+  mistral: "https://api.mistral.ai/v1",
+  cohere: "https://api.cohere.ai/v1",
+  perplexity: "https://api.perplexity.ai",
+  nvidia: "https://integrate.api.nvidia.com/v1"
+};
+var PROVIDER_ENV_VARS = {
+  openrouter: "OPENROUTER_API_KEY",
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+  google: "GOOGLE_API_KEY",
+  xai: "XAI_API_KEY",
+  deepseek: "DEEPSEEK_API_KEY",
+  moonshot: "MOONSHOT_API_KEY",
+  opencode: "OPENCODE_API_KEY",
+  azure: "AZURE_OPENAI_API_KEY",
+  anyscale: "ANYSCALE_API_KEY",
+  together: "TOGETHER_API_KEY",
+  fireworks: "FIREWORKS_API_KEY",
+  mistral: "MISTRAL_API_KEY",
+  cohere: "COHERE_API_KEY",
+  perplexity: "PERPLEXITY_API_KEY",
+  nvidia: "NVIDIA_API_KEY"
+};
+function getProxyPort2() {
+  const envPort = process.env.OMNI_LLM_PORT;
+  if (envPort) {
+    const parsed = parseInt(envPort, 10);
+    if (!isNaN(parsed) && parsed > 0 && parsed < 65536) return parsed;
+  }
+  return DEFAULT_PORT2;
+}
+async function checkExistingProxy(port) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/health`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      const data = await response.json();
+      return data.status === "ok";
+    }
+    return false;
+  } catch {
+    clearTimeout(timeoutId);
+    return false;
+  }
+}
+function resolveProvider(model) {
+  if (model.startsWith("omni-llm/")) {
+    model = model.replace("omni-llm/", "");
+  }
+  const resolvedModelId = resolveModelAlias(model);
+  const modelInfo = getModel(resolvedModelId);
+  if (modelInfo) {
+    return { provider: modelInfo.provider, modelId: modelInfo.id };
+  }
+  for (const provider of Object.keys(PROVIDER_URLS)) {
+    if (resolvedModelId.startsWith(provider) || resolvedModelId.startsWith(`${provider}/`)) {
+      return {
+        provider,
+        modelId: resolvedModelId.replace(`${provider}/`, "")
+      };
+    }
+  }
+  return { provider: "openrouter", modelId: resolvedModelId };
+}
+function getApiKey(provider) {
+  const envVar = PROVIDER_ENV_VARS[provider];
+  return process.env[envVar];
+}
+async function handleChatCompletions(req, res, body) {
+  try {
+    const request = JSON.parse(body);
+    const model = request.model || "auto";
+    console.log(`[OmniLLM] Request for model: ${model}`);
+    const resolved = resolveProvider(model);
+    if (!resolved) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unable to resolve model" }));
+      return;
+    }
+    const { provider, modelId } = resolved;
+    const apiKey = getApiKey(provider);
+    if (!apiKey) {
+      const openrouterKey = getApiKey("openrouter");
+      if (openrouterKey && provider !== "openrouter") {
+        console.log(`[OmniLLM] No API key for ${provider}, falling back to OpenRouter`);
+        return routeToOpenRouter(req, res, request, modelId, openrouterKey);
+      }
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        error: `No API key configured for provider: ${provider}. Set ${PROVIDER_ENV_VARS[provider]} environment variable.`
+      }));
+      return;
+    }
+    await routeToProvider(req, res, request, provider, modelId, apiKey);
+  } catch (error) {
+    console.error("[OmniLLM] Error handling request:", error);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      error: error instanceof Error ? error.message : "Internal server error"
+    }));
+  }
+}
+async function routeToProvider(req, res, request, provider, modelId, apiKey) {
+  const baseUrl = PROVIDER_URLS[provider];
+  const providerRequest = buildProviderRequest(request, provider, modelId);
+  console.log(`[OmniLLM] Routing to ${provider} with model ${modelId}`);
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+      ...provider === "openrouter" ? { "HTTP-Referer": "http://localhost:8403", "X-Title": "OmniLLM" } : {}
+    },
+    body: JSON.stringify(providerRequest)
+  });
+  if (!response.ok) {
+    const error = await response.text();
+    console.error(`[OmniLLM] Provider error (${response.status}):`, error);
+    res.writeHead(response.status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: `Provider error: ${error}` }));
+    return;
+  }
+  const isStreaming = request.stream === true;
+  if (isStreaming && response.body) {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive"
+    });
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    } finally {
+      res.end();
+    }
+  } else {
+    const data = await response.text();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(data);
+  }
+}
+async function routeToOpenRouter(req, res, request, modelId, apiKey) {
+  const openrouterModel = modelId.includes("/") ? modelId : `${getProviderFromModel(modelId)}/${modelId}`;
+  console.log(`[OmniLLM] Routing through OpenRouter: ${openrouterModel}`);
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+      "HTTP-Referer": "http://localhost:8403",
+      "X-Title": "OmniLLM"
+    },
+    body: JSON.stringify({
+      ...request,
+      model: openrouterModel
+    })
+  });
+  if (!response.ok) {
+    const error = await response.text();
+    console.error(`[OmniLLM] OpenRouter error (${response.status}):`, error);
+    res.writeHead(response.status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: `OpenRouter error: ${error}` }));
+    return;
+  }
+  const isStreaming = request.stream === true;
+  if (isStreaming && response.body) {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive"
+    });
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    } finally {
+      res.end();
+    }
+  } else {
+    const data = await response.text();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(data);
+  }
+}
+function buildProviderRequest(request, provider, modelId) {
+  const baseRequest = {
+    model: modelId,
+    messages: request.messages,
+    temperature: request.temperature,
+    max_tokens: request.max_tokens || request.maxTokens,
+    top_p: request.top_p || request.topP,
+    stream: request.stream
+  };
+  switch (provider) {
+    case "anthropic":
+      return {
+        model: modelId,
+        messages: request.messages,
+        max_tokens: request.max_tokens || request.maxTokens || 4096,
+        temperature: request.temperature,
+        top_p: request.top_p || request.topP,
+        stream: request.stream
+      };
+    case "google":
+      return {
+        model: modelId,
+        contents: request.messages.map((m) => ({
+          role: m.role === "assistant" ? "model" : m.role,
+          parts: [{ text: m.content }]
+        })),
+        generationConfig: {
+          temperature: request.temperature,
+          maxOutputTokens: request.max_tokens || request.maxTokens,
+          topP: request.top_p || request.topP
+        }
+      };
+    default:
+      return baseRequest;
+  }
+}
+function getProviderFromModel(modelId) {
+  const prefixes = {
+    "gpt": "openai",
+    "claude": "anthropic",
+    "gemini": "google",
+    "grok": "xai",
+    "deepseek": "deepseek",
+    "kimi": "moonshot",
+    "big-pickle": "opencode",
+    "glm5": "nvidia"
+  };
+  for (const [prefix, provider] of Object.entries(prefixes)) {
+    if (modelId.toLowerCase().includes(prefix)) {
+      return provider;
+    }
+  }
+  return "openrouter";
+}
+async function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+async function startProxy(options = {}) {
+  const port = options.port || getProxyPort2();
+  const existing = await checkExistingProxy(port);
+  if (existing) {
+    console.log(`[OmniLLM] Proxy already running on port ${port}`);
+    return {
+      port,
+      baseUrl: `http://127.0.0.1:${port}`,
+      close: async () => {
+      }
+    };
+  }
+  return new Promise((resolve, reject) => {
+    const server = createServer(async (req, res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      if (req.method === "OPTIONS") {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+      if (req.url === "/health" && req.method === "GET") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", provider: "omni-llm" }));
+        return;
+      }
+      if (req.url === "/v1/models" && req.method === "GET") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          object: "list",
+          data: Object.keys(getModel).map((id) => ({
+            id,
+            object: "model",
+            created: Date.now(),
+            owned_by: "omni-llm"
+          }))
+        }));
+        return;
+      }
+      if (req.url === "/v1/chat/completions" && req.method === "POST") {
+        try {
+          const body = await readBody(req);
+          await handleChatCompletions(req, res, body);
+        } catch (error) {
+          console.error("[OmniLLM] Error:", error);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Internal server error" }));
+        }
+        return;
+      }
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not found" }));
+    });
+    server.listen(port, "127.0.0.1", () => {
+      const address = server.address();
+      console.log(`[OmniLLM] Proxy listening on port ${address.port}`);
+      if (options.onReady) {
+        options.onReady(address.port);
+      }
+      resolve({
+        port: address.port,
+        baseUrl: `http://127.0.0.1:${address.port}`,
+        close: () => {
+          return new Promise((res) => {
+            server.close(() => res());
+          });
+        }
+      });
+    });
+    server.on("error", (error) => {
+      console.error("[OmniLLM] Server error:", error);
+      if (options.onError) {
+        options.onError(error);
+      }
+      reject(error);
+    });
+  });
+}
+
 // src/index.ts
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 var activeProxyHandle = null;
+async function startProxyServer(api) {
+  try {
+    const proxy = await startProxy({
+      port: getProxyPort(),
+      onReady: (port) => {
+        api.logger.info(`OmniLLM proxy listening on port ${port}`);
+      },
+      onError: (error) => {
+        api.logger.error(`OmniLLM proxy error: ${error.message}`);
+      }
+    });
+    activeProxyHandle = proxy;
+    const healthy = await waitForProxyHealth(proxy.port, 5e3);
+    if (!healthy) {
+      api.logger.warn("OmniLLM proxy health check timed out");
+    }
+  } catch (err) {
+    api.logger.error(`Failed to start OmniLLM proxy: ${err instanceof Error ? err.message : String(err)}`);
+    throw err;
+  }
+}
+async function waitForProxyHealth(port, timeoutMs = 3e3) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/health`);
+      if (res.ok) return true;
+    } catch {
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+}
 function isCompletionMode() {
   return process.argv.some((arg, i) => arg === "completion" && i >= 1 && i <= 3);
 }
@@ -752,7 +1141,8 @@ var plugin = {
     });
     api.registerService({
       id: "omni-llm-service",
-      start: () => {
+      start: async () => {
+        await startProxyServer(api);
       },
       stop: async () => {
         if (activeProxyHandle) {
@@ -763,6 +1153,9 @@ var plugin = {
           activeProxyHandle = null;
         }
       }
+    });
+    startProxyServer(api).catch((err) => {
+      api.logger.error(`Failed to start proxy: ${err instanceof Error ? err.message : String(err)}`);
     });
   }
 };
@@ -783,6 +1176,7 @@ export {
   getStats,
   isAgenticModel,
   omniLLMProvider,
-  resolveModelAlias
+  resolveModelAlias,
+  startProxy
 };
 //# sourceMappingURL=index.js.map

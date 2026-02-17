@@ -21,12 +21,56 @@ import { VERSION } from "./version.js";
 import { OPENCLAW_MODELS, buildProviderModels } from "./models.js";
 import { loadProviderConfig, loadApiKeysFromEnv } from "./config/index.js";
 import { getStats, formatStatsAscii } from "./stats.js";
+import { startProxy, type ProxyHandle } from "./proxy.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 // Track active proxy handle for cleanup
-let activeProxyHandle: { close: () => Promise<void> } | null = null;
+let activeProxyHandle: ProxyHandle | null = null;
+
+/**
+ * Start the proxy server in background
+ */
+async function startProxyServer(api: OpenClawPluginApi): Promise<void> {
+  try {
+    const proxy = await startProxy({
+      port: getProxyPort(),
+      onReady: (port) => {
+        api.logger.info(`OmniLLM proxy listening on port ${port}`);
+      },
+      onError: (error) => {
+        api.logger.error(`OmniLLM proxy error: ${error.message}`);
+      },
+    });
+    
+    activeProxyHandle = proxy;
+    
+    // Health check
+    const healthy = await waitForProxyHealth(proxy.port, 5000);
+    if (!healthy) {
+      api.logger.warn("OmniLLM proxy health check timed out");
+    }
+  } catch (err) {
+    api.logger.error(`Failed to start OmniLLM proxy: ${err instanceof Error ? err.message : String(err)}`);
+    throw err;
+  }
+}
+
+/**
+ * Wait for proxy to be healthy
+ */
+async function waitForProxyHealth(port: number, timeoutMs = 3000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/health`);
+      if (res.ok) return true;
+    } catch { /* not ready */ }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+}
 
 /**
  * Check if running in completion mode (direct model usage)
@@ -323,7 +367,9 @@ const plugin: OpenClawPluginDefinition = {
     // Register service for cleanup
     api.registerService({
       id: "omni-llm-service",
-      start: () => {},
+      start: async () => {
+        await startProxyServer(api);
+      },
       stop: async () => {
         if (activeProxyHandle) {
           try {
@@ -335,6 +381,11 @@ const plugin: OpenClawPluginDefinition = {
         }
       },
     });
+
+    // Start proxy immediately
+    startProxyServer(api).catch((err) => {
+      api.logger.error(`Failed to start proxy: ${err instanceof Error ? err.message : String(err)}`);
+    });
   },
 };
 
@@ -342,6 +393,8 @@ export default plugin;
 
 // Re-exports for library usage
 export { omniLLMProvider, getProxyPort } from "./provider.js";
+export { startProxy } from "./proxy.js";
+export type { ProxyHandle } from "./proxy.js";
 export {
   OPENCLAW_MODELS,
   MODEL_ALIASES,
