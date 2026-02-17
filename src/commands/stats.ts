@@ -1,4 +1,10 @@
-import type { OpenClawPluginCommandDefinition, PluginCommandContext } from "../types/openclaw.js";
+/**
+ * Commands - Stats
+ * 
+ * Show OmniLLM usage statistics
+ */
+
+import type { OpenClawPluginCommandDefinition, PluginCommandContext, PluginCommandResult } from "../types/openclaw.js";
 
 export async function createStatsCommand(): Promise<OpenClawPluginCommandDefinition> {
   return {
@@ -6,8 +12,8 @@ export async function createStatsCommand(): Promise<OpenClawPluginCommandDefinit
     description: "Show OmniLLM usage statistics",
     acceptsArgs: true,
     requireAuth: false,
-    handler: async (ctx: PluginCommandContext) => {
-      await ctx.reply("Stats command - implement with manager.getStats()");
+    handler: async (ctx: PluginCommandContext): Promise<PluginCommandResult> => {
+      return { text: "Stats command - implement with actual data collection" };
     },
   };
 }

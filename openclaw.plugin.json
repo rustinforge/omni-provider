@@ -1,10 +1,18 @@
 {
   "id": "omni-llm",
   "name": "OmniLLM",
-  "version": "1.0.0",
-  "description": "Multi-provider LLM router - OpenRouter, OpenAI, Anthropic, Google, xAI, DeepSeek, OpenCode and more",
-  "main": "dist/index.js",
-  "type": "module",
-  "keywords": ["openclaw", "llm", "router", "openai", "anthropic", "google", "opencode"],
-  "license": "MIT"
+  "description": "Multi-provider LLM router — OpenRouter, OpenAI, Anthropic, Google, xAI, DeepSeek, OpenCode and more",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "providers": {
+        "type": "object",
+        "description": "API keys per provider: { \"openai\": { \"apiKey\": \"sk-...\" }, ... }"
+      },
+      "routing": {
+        "type": "object",
+        "description": "Override default routing configuration"
+      }
+    }
+  }
 }

@@ -1,8 +1,16 @@
 /**
- * Stats Collector
+ * Stats Collector and Utilities
  */
 
 import type { LLMProvider, ProviderStats, AggregatedStats } from "./types";
+
+export interface DailyStats {
+  date: string;
+  requests: number;
+  promptTokens: number;
+  completionTokens: number;
+  cost: number;
+}
 
 export class StatsCollector {
   private stats: Map<LLMProvider, ProviderStats> = new Map();
@@ -35,4 +43,42 @@ export class StatsCollector {
     }
     return { totalRequests, totalPromptTokens: totalPrompt, totalCompletionTokens: totalCompletion, totalCost, totalErrors, byProvider: Array.from(this.stats.values()), savingsVsOpenRouter: 0 };
   }
+}
+
+/**
+ * Get stats for a time period
+ */
+export async function getStats(days: number): Promise<DailyStats[]> {
+  // Placeholder implementation - in production this would read from logs
+  return Array.from({ length: days }, (_, i) => ({
+    date: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    requests: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    cost: 0,
+  }));
+}
+
+/**
+ * Format stats as ASCII table
+ */
+export function formatStatsAscii(stats: DailyStats[]): string {
+  if (stats.length === 0) return "No stats available";
+  
+  const lines = [
+    "OmniLLM Usage Statistics",
+    "========================",
+    "",
+    "Date        | Requests | Tokens  | Cost",
+    "------------|----------|---------|-------",
+  ];
+  
+  for (const day of stats) {
+    const tokens = day.promptTokens + day.completionTokens;
+    lines.push(
+      `${day.date} | ${day.requests.toString().padStart(8)} | ${tokens.toString().padStart(7)} | $${day.cost.toFixed(4)}`
+    );
+  }
+  
+  return lines.join("\n");
 }

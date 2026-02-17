@@ -1,62 +1,176 @@
 /**
- * OpenClaw Type Stubs
- * Minimal type definitions for OmniLLM
+ * OpenClaw Plugin Types
+ * 
+ * Types matching the OpenClaw plugin SDK for ProviderPlugin integration.
+ * Based on ClawRouter pattern for maximum compatibility.
  */
 
-export interface OpenClawPluginApi {
-  registerCommand(command: OpenClawPluginCommandDefinition): void;
-  registerProvider(provider: OpenClawProviderDefinition): void;
-  getConfig(): OpenClawConfig;
-  on(event: string, handler: Function): void;
-  logger: {
-    info(message: string): void;
-    warn(message: string): void;
-    error(message: string): void;
-    debug(message: string): void;
-  };
-  pluginConfig: Record<string, unknown>;
-  registerService(service: { id: string; start: () => Promise<void>; stop: () => Promise<void> }): void;
-}
+// Model API types
+export type ModelApi =
+  | "openai-completions"
+  | "openai-responses"
+  | "anthropic-messages"
+  | "google-generative-ai"
+  | "github-copilot"
+  | "bedrock-converse-stream";
 
-export interface OpenClawPluginDefinition {
+// Model definition configuration
+export type ModelDefinitionConfig = {
   id: string;
   name: string;
-  description?: string;
-  version: string;
-  register(api: OpenClawPluginApi): void;
-}
+  api?: ModelApi;
+  reasoning: boolean;
+  input: Array<"text" | "image">;
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  };
+  contextWindow: number;
+  maxTokens: number;
+  headers?: Record<string, string>;
+};
 
-export interface OpenClawPluginCommandDefinition {
+// Model provider configuration
+export type ModelProviderConfig = {
+  baseUrl: string;
+  apiKey?: string;
+  api?: ModelApi;
+  headers?: Record<string, string>;
+  authHeader?: boolean;
+  models: ModelDefinitionConfig[];
+};
+
+// Authentication types
+export type AuthProfileCredential = {
+  apiKey?: string;
+  type?: string;
+  [key: string]: unknown;
+};
+
+export type ProviderAuthResult = {
+  profiles: Array<{ profileId: string; credential: AuthProfileCredential }>;
+  configPatch?: Record<string, unknown>;
+  defaultModel?: string;
+  notes?: string[];
+};
+
+export type WizardPrompter = {
+  text: (opts: {
+    message: string;
+    validate?: (value: string) => string | undefined;
+  }) => Promise<string | symbol>;
+  note: (message: string) => void;
+  progress: (message: string) => { stop: (message?: string) => void };
+};
+
+export type ProviderAuthContext = {
+  config: Record<string, unknown>;
+  agentDir?: string;
+  workspaceDir?: string;
+  prompter: WizardPrompter;
+  runtime: { log: (message: string) => void };
+  isRemote: boolean;
+  openUrl: (url: string) => Promise<void>;
+};
+
+export type ProviderAuthMethod = {
+  id: string;
+  label: string;
+  hint?: string;
+  kind: "oauth" | "api_key" | "token" | "device_code" | "custom";
+  run: (ctx: ProviderAuthContext) => Promise<ProviderAuthResult>;
+};
+
+// The main ProviderPlugin interface
+export type ProviderPlugin = {
+  id: string;
+  label: string;
+  docsPath?: string;
+  aliases?: string[];
+  envVars?: string[];
+  models?: ModelProviderConfig;
+  auth: ProviderAuthMethod[];
+  formatApiKey?: (cred: AuthProfileCredential) => string;
+};
+
+// Logger types
+export type PluginLogger = {
+  debug?: (message: string) => void;
+  info: (message: string) => void;
+  warn: (message: string) => void;
+  error: (message: string) => void;
+};
+
+// Service types
+export type OpenClawPluginService = {
+  id: string;
+  start: () => void | Promise<void>;
+  stop?: () => void | Promise<void>;
+};
+
+// Main plugin API
+export type OpenClawPluginApi = {
+  id: string;
   name: string;
+  version?: string;
   description?: string;
+  source: string;
+  config: Record<string, unknown> & {
+    models?: { providers?: Record<string, ModelProviderConfig> };
+    agents?: Record<string, unknown>;
+  };
+  pluginConfig?: Record<string, unknown>;
+  logger: PluginLogger;
+  registerProvider: (provider: ProviderPlugin) => void;
+  registerTool: (tool: unknown, opts?: unknown) => void;
+  registerHook: (events: string | string[], handler: unknown, opts?: unknown) => void;
+  registerHttpRoute: (params: { path: string; handler: unknown }) => void;
+  registerService: (service: OpenClawPluginService) => void;
+  registerCommand: (command: unknown) => void;
+  resolvePath: (input: string) => string;
+  on: (hookName: string, handler: unknown, opts?: unknown) => void;
+};
+
+// Plugin definition
+export type OpenClawPluginDefinition = {
+  id?: string;
+  name?: string;
+  description?: string;
+  version?: string;
+  register?: (api: OpenClawPluginApi) => void | Promise<void>;
+  activate?: (api: OpenClawPluginApi) => void | Promise<void>;
+};
+
+// Command types
+export type PluginCommandContext = {
+  senderId?: string;
+  channel: string;
+  isAuthorizedSender: boolean;
+  args?: string;
+  commandBody: string;
+  config: Record<string, unknown>;
+};
+
+export type PluginCommandResult = {
+  text?: string;
+  isError?: boolean;
+};
+
+export type PluginCommandHandler = (
+  ctx: PluginCommandContext,
+) => PluginCommandResult | Promise<PluginCommandResult>;
+
+export type OpenClawPluginCommandDefinition = {
+  name: string;
+  description: string;
   acceptsArgs?: boolean;
   requireAuth?: boolean;
-  handler: (context: PluginCommandContext) => Promise<void>;
-}
+  handler: PluginCommandHandler;
+};
 
-export interface PluginCommandContext {
-  args: string[];
-  message: {
-    chat: { id: number | string };
-    from: { id: number; first_name?: string; username?: string };
-    text: string;
-  };
-  reply(text: string, options?: Record<string, unknown>): Promise<unknown>;
-}
-
-export interface OpenClawProviderDefinition {
-  name: string;
-  apiKey?: string;
-  baseUrl?: string;
-  models: string[];
-}
-
-export interface OpenClawConfig {
-  providers?: Record<string, ProviderConfig>;
-  apiKeys?: ApiKeysConfig;
-  [key: string]: unknown;
-}
-
+// Legacy types for backward compatibility
 export interface ProviderConfig {
   enabled?: boolean;
   apiKey?: string;

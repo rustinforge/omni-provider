@@ -1,4 +1,10 @@
-import type { OpenClawPluginCommandDefinition, PluginCommandContext } from "../types/openclaw.js";
+/**
+ * Commands - Providers
+ * 
+ * Show configured LLM providers
+ */
+
+import type { OpenClawPluginCommandDefinition, PluginCommandContext, PluginCommandResult } from "../types/openclaw.js";
 import type { LLMProviderManager } from "../core/manager.js";
 
 export async function createProvidersCommand(manager: LLMProviderManager): Promise<OpenClawPluginCommandDefinition> {
@@ -7,13 +13,13 @@ export async function createProvidersCommand(manager: LLMProviderManager): Promi
     description: "Show configured LLM providers",
     acceptsArgs: false,
     requireAuth: false,
-    handler: async (context: PluginCommandContext) => {
+    handler: async (context: PluginCommandContext): Promise<PluginCommandResult> => {
       const providers = manager.getEnabledProviders();
       const lines = ["**OmniLLM Providers:**", ""];
       for (const p of providers) {
         lines.push(`• ${p}`);
       }
-      await context.reply(lines.join("\n"));
+      return { text: lines.join("\n") };
     },
   };
 }
