@@ -28,7 +28,8 @@ export type LLMProvider =
   | 'mistral'
   | 'cohere'
   | 'perplexity'
-  | 'nvidia';
+  | 'nvidia'
+  | 'chutes';
 
 export interface ProviderConfig {
   enabled: boolean;

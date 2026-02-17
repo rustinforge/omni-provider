@@ -1,6 +1,6 @@
 # Omni-LLM for OpenClaw
 
-A smart multi-provider LLM router plugin for OpenClaw. Automatically route requests to the best available model from 15+ providers including OpenAI, Anthropic, Google, xAI, DeepSeek, and free models from OpenCode.
+A smart multi-provider LLM router plugin for OpenClaw. Automatically route requests to the best available model from 15+ providers including OpenAI, Anthropic, Google, xAI, DeepSeek, Chutes, and free models from OpenCode.
 
 ## Quick Start
 
@@ -19,17 +19,17 @@ openclaw models set omni-llm/auto
 
 ## Features
 
-- **Smart Auto-Routing** - Automatically picks the best model based on your request
-- **Free Models First** - Prioritizes OpenCode's free tier (Big Pickle, GPT-5 Nano, Kimi Free, MiniMax Free)
-- **Fallback Chain** - Seamlessly falls back to other providers if one fails
-- **Cost Optimization** - Routes to cheaper models for simple queries, premium models for complex tasks
-- **15+ Providers** - OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot, OpenCode, Azure, and more
+- **Smart Auto-Routing** - Automatically picks the best model based on your request complexity
+- **Free Models First** - Prioritizes free tier from OpenCode, Chutes, and NVIDIA
+- **Intelligent Rotation** - Rotates between providers on rate limits or failures
+- **Cost Optimization** - Routes simple queries to free models, complex tasks to paid models
+- **15+ Providers** - OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot, OpenCode, Chutes, NVIDIA, Azure, and more
 
 ## Supported Models
 
 | Command | Model | Provider | Price |
 |---------|-------|----------|-------|
-| `omni-llm/auto` | Auto-selected | Best available | Varies |
+| `omni-llm/auto` | Auto-selected | Smart routing | Varies |
 | `omni-llm/sonnet` | Claude Sonnet 4 | Anthropic | $3/M |
 | `omni-llm/opus` | Claude Opus 4 | Anthropic | $15/M |
 | `omni-llm/gpt` | GPT-4o | OpenAI | $5/M |
@@ -39,8 +39,11 @@ openclaw models set omni-llm/auto
 | `omni-llm/big-pickle` | Big Pickle | OpenCode | **FREE** |
 | `omni-llm/gpt-nano` | GPT-5 Nano | OpenCode | **FREE** |
 | `omni-llm/kimi-free` | Kimi K2.5 Free | OpenCode | **FREE** |
+| `omni-llm/bossgirl` | Bossgirl | Chutes | **FREE** |
+| `omni-llm/glm5` | GLM-5 | Chutes/NVIDIA | **FREE** |
 | `omni-llm/deepseek` | DeepSeek V3 | DeepSeek | $0.27/M |
 | `omni-llm/grok` | Grok 3 | xAI | $5/M |
+| `omni-llm/nemotron` | Nemotron 70B | NVIDIA | **FREE** |
 
 ## Installation
 
@@ -65,7 +68,12 @@ Set these in your shell or systemd service:
 
 ```bash
 # Free models (no API key needed)
-# Uses OpenCode's free tier automatically
+# Uses OpenCode, Chutes, and NVIDIA free tiers automatically
+
+# Free/discounted providers (API key required)
+export OPENCODE_API_KEY="your-opencode-key"    # Big Pickle, GPT-5 Nano, Kimi Free
+export CHUTES_API_KEY="your-chutes-key"        # Bossgirl, GLM-5, discounted models
+export NVIDIA_API_KEY="your-nvidia-key"        # Nemotron 70B, Mistral Large
 
 # Paid providers
 export OPENAI_API_KEY="sk-your-key"
@@ -75,9 +83,6 @@ export XAI_API_KEY="your-xai-key"
 export DEEPSEEK_API_KEY="your-deepseek-key"
 export OPENROUTER_API_KEY="your-openrouter-key"
 export AZURE_OPENAI_API_KEY="your-azure-key"
-
-# For OpenCode (optional - many models are free)
-export OPENCODE_API_KEY="your-opencode-key"
 ```
 
 ## Usage
@@ -143,19 +148,20 @@ omni-llm/kimi      # Kimi K2.5 (Moonshot)
 
 ### Smart Routing Tiers
 
-The router classifies requests into tiers:
+The router classifies requests into tiers and rotates between available providers:
 
-- **simple** (< 200 chars) → Gemini 2.5 Flash (fast & cheap)
-- **medium** (200-2000 chars) → Grok 3 (balanced)
-- **complex** (> 2000 chars) → Gemini 2.5 Pro (high context)
-- **reasoning** (math/logic) → o3-mini (reasoning optimized)
-- **vision** (images) → GPT-4o (vision capable)
+- **simple** (< 200 chars) → OpenCode Big Pickle, OpenRouter auto, free models
+- **medium** (200-2000 chars) → Chutes GLM-5, Kimi K2.5, NVIDIA Nemotron
+- **complex** (> 2000 chars) → Chutes high-perf, Claude Sonnet, Gemini Pro, GPT-4o
+- **reasoning** (math/logic/code) → Chutes Kimi, DeepSeek R1, o3-mini, Claude Opus
+- **vision** (images) → Big Pickle, Gemini Flash, GPT-4o, Claude Sonnet
 
 ### Provider Priority
 
-1. **Free models** (OpenCode) - Big Pickle, GPT-5 Nano, Kimi Free
-2. **Direct providers** - OpenAI, Anthropic, Google, xAI, DeepSeek
-3. **Meta-providers** - OpenRouter (fallback)
+1. **Free models** - OpenCode (Big Pickle, GPT-5 Nano), Chutes (GLM-5, Bossgirl), NVIDIA (Nemotron)
+2. **Discounted providers** - Chutes (cheaper rates than direct)
+3. **Direct providers** - OpenAI, Anthropic, Google, xAI, DeepSeek
+4. **Meta-providers** - OpenRouter (fallback for all models)
 
 ### Fallback Chain
 

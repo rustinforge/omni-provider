@@ -58,6 +58,7 @@ export function loadConfig(env: Record<string, string | undefined>): ProvidersCo
     mistral: { enabled: false },
     cohere: { enabled: false },
     perplexity: { enabled: false },
+    chutes: { enabled: false },
   };
   
   const config = applyEnvOverrides(defaultConfig);
@@ -107,6 +108,7 @@ export function loadProviderConfig(pluginConfig?: Record<string, unknown>): { pr
     mistral: { enabled: false },
     cohere: { enabled: false },
     perplexity: { enabled: false },
+    chutes: { enabled: false },
   };
 
   let config: ProvidersConfig = { ...defaultConfig };
@@ -211,6 +213,11 @@ function applyEnvOverrides(config: ProvidersConfig): ProvidersConfig {
     config.perplexity = { ...config.perplexity, enabled: true, apiKey: process.env.PERPLEXITY_API_KEY };
   }
 
+  // Chutes
+  if (process.env.CHUTES_API_KEY) {
+    config.chutes = { ...config.chutes, enabled: true, apiKey: process.env.CHUTES_API_KEY };
+  }
+
   return config;
 }
 
@@ -221,7 +228,8 @@ function isValidProvider(provider: string): provider is LLMProvider {
   const validProviders: LLMProvider[] = [
     'openrouter', 'openai', 'anthropic', 'google', 'xai', 
     'deepseek', 'moonshot', 'opencode', 'azure', 'anyscale',
-    'together', 'fireworks', 'mistral', 'cohere', 'perplexity'
+    'together', 'fireworks', 'mistral', 'cohere', 'perplexity',
+    'chutes'
   ];
   return validProviders.includes(provider as LLMProvider);
 }
@@ -246,6 +254,7 @@ export function loadApiKeysFromEnv(): ApiKeysConfig {
     mistral: { apiKey: process.env.MISTRAL_API_KEY },
     cohere: { apiKey: process.env.COHERE_API_KEY },
     perplexity: { apiKey: process.env.PERPLEXITY_API_KEY },
+    chutes: { apiKey: process.env.CHUTES_API_KEY },
   };
 }
 
@@ -270,5 +279,6 @@ Environment Variables (LLM Providers):
   MISTRAL_API_KEY       - Mistral
   COHERE_API_KEY        - Cohere
   PERPLEXITY_API_KEY    - Perplexity
+  CHUTES_API_KEY        - Chutes (cheap/discounted models)
 `.trim();
 }

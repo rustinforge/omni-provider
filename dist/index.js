@@ -377,7 +377,8 @@ function loadProviderConfig(pluginConfig) {
     fireworks: { enabled: false },
     mistral: { enabled: false },
     cohere: { enabled: false },
-    perplexity: { enabled: false }
+    perplexity: { enabled: false },
+    chutes: { enabled: false }
   };
   let config = { ...defaultConfig };
   if (pluginConfig?.providers) {
@@ -442,6 +443,9 @@ function applyEnvOverrides(config) {
   if (process.env.PERPLEXITY_API_KEY) {
     config.perplexity = { ...config.perplexity, enabled: true, apiKey: process.env.PERPLEXITY_API_KEY };
   }
+  if (process.env.CHUTES_API_KEY) {
+    config.chutes = { ...config.chutes, enabled: true, apiKey: process.env.CHUTES_API_KEY };
+  }
   return config;
 }
 function isValidProvider(provider) {
@@ -460,7 +464,8 @@ function isValidProvider(provider) {
     "fireworks",
     "mistral",
     "cohere",
-    "perplexity"
+    "perplexity",
+    "chutes"
   ];
   return validProviders.includes(provider);
 }
@@ -480,7 +485,8 @@ function loadApiKeysFromEnv() {
     fireworks: { apiKey: process.env.FIREWORKS_API_KEY },
     mistral: { apiKey: process.env.MISTRAL_API_KEY },
     cohere: { apiKey: process.env.COHERE_API_KEY },
-    perplexity: { apiKey: process.env.PERPLEXITY_API_KEY }
+    perplexity: { apiKey: process.env.PERPLEXITY_API_KEY },
+    chutes: { apiKey: process.env.CHUTES_API_KEY }
   };
 }
 
@@ -532,7 +538,8 @@ var PROVIDER_URLS = {
   mistral: "https://api.mistral.ai/v1",
   cohere: "https://api.cohere.ai/v1",
   perplexity: "https://api.perplexity.ai",
-  nvidia: "https://integrate.api.nvidia.com/v1"
+  nvidia: "https://integrate.api.nvidia.com/v1",
+  chutes: "https://llm.chutes.ai/v1"
 };
 var PROVIDER_ENV_VARS = {
   openrouter: "OPENROUTER_API_KEY",
@@ -550,7 +557,8 @@ var PROVIDER_ENV_VARS = {
   mistral: "MISTRAL_API_KEY",
   cohere: "COHERE_API_KEY",
   perplexity: "PERPLEXITY_API_KEY",
-  nvidia: "NVIDIA_API_KEY"
+  nvidia: "NVIDIA_API_KEY",
+  chutes: "CHUTES_API_KEY"
 };
 function getProxyPort2() {
   const envPort = process.env.OMNI_LLM_PORT;
@@ -578,9 +586,181 @@ async function checkExistingProxy(port) {
     return false;
   }
 }
+function classifyRequest(request) {
+  const content = request.messages?.map((m) => m.content).join(" ").toLowerCase() || "";
+  if (/prove|explain.*step|calculate|derive|logic|proof|theorem|math|code|debug|analyze|complex/i.test(content)) {
+    return "reasoning";
+  }
+  if (request.messages?.some((m) => typeof m.content === "object" && Array.isArray(m.content) && m.content.some((p) => p.type === "image_url"))) {
+    return "vision";
+  }
+  if (content.length < 200) return "simple";
+  if (content.length < 2e3) return "medium";
+  return "complex";
+}
+function getAllModelsForTier(tier) {
+  const tierModels = {
+    simple: [
+      // Rotate between OpenCode Big Pickle and OpenRouter free auto router
+      { provider: "opencode", model: "big-pickle", isPaid: false },
+      { provider: "openrouter", model: "openrouter/auto", isPaid: false },
+      // Other OpenCode free models
+      { provider: "opencode", model: "kimi-k2.5-free", isPaid: false },
+      { provider: "opencode", model: "gpt-5-nano", isPaid: false },
+      { provider: "opencode", model: "minimax-m2.5-free", isPaid: false },
+      // Additional fallbacks
+      { provider: "chutes", model: "chutes/llama-3.1-70b", isPaid: false },
+      { provider: "nvidia", model: "nvidia/llama-3.1-nemotron-70b-instruct", isPaid: false },
+      { provider: "nvidia", model: "nvidia/mistral-large", isPaid: false }
+    ],
+    medium: [
+      // Chutes GLM and Kimi first
+      { provider: "chutes", model: "zai-org/GLM-5-TEE", isPaid: false },
+      { provider: "chutes", model: "moonshotai/Kimi-K2.5-TEE", isPaid: false },
+      // OpenCode as backup
+      { provider: "opencode", model: "gpt-5-nano", isPaid: false },
+      // OpenRouter GLM
+      { provider: "openrouter", model: "z-ai/glm-4.5", isPaid: false },
+      { provider: "openrouter", model: "z-ai/glm-4.5-air", isPaid: false },
+      // NVIDIA
+      { provider: "nvidia", model: "nvidia/llama-3.1-nemotron-70b-instruct", isPaid: false },
+      { provider: "nvidia", model: "nvidia/mistral-large", isPaid: false }
+    ],
+    complex: [
+      // Chutes GLM and Kimi
+      { provider: "chutes", model: "zai-org/GLM-5-TEE", isPaid: false },
+      { provider: "chutes", model: "moonshotai/Kimi-K2.5-TEE", isPaid: false },
+      // OpenRouter
+      { provider: "openrouter", model: "z-ai/glm-4.5", isPaid: false },
+      // NVIDIA
+      { provider: "nvidia", model: "nvidia/mistral-large", isPaid: false },
+      // Paid fallbacks
+      { provider: "openrouter", model: "anthropic/claude-sonnet-4", isPaid: true },
+      { provider: "openrouter", model: "google/gemini-2.5-pro", isPaid: true },
+      { provider: "openrouter", model: "openai/gpt-4o", isPaid: true }
+    ],
+    reasoning: [
+      // Chutes Kimi for reasoning
+      { provider: "chutes", model: "moonshotai/Kimi-K2.5-TEE", isPaid: false },
+      // OpenRouter o3-mini for reasoning
+      { provider: "openrouter", model: "openai/o3-mini", isPaid: true },
+      // HIGHEST COMPLEXITY - Opus 4.6 via OpenRouter
+      { provider: "openrouter", model: "anthropic/claude-opus-4", isPaid: true }
+    ],
+    vision: [
+      { provider: "opencode", model: "big-pickle", isPaid: false },
+      { provider: "openrouter", model: "google/gemini-2.5-flash", isPaid: false },
+      { provider: "openrouter", model: "anthropic/claude-sonnet-4", isPaid: true },
+      { provider: "openrouter", model: "openai/gpt-4o", isPaid: true }
+    ]
+  };
+  const allModels = tierModels[tier] || tierModels.medium;
+  return allModels.filter(({ provider }) => {
+    const apiKey = getApiKey(provider);
+    return !!apiKey;
+  });
+}
+async function routeToProviderWithFallback(req, res, request, provider, modelId, apiKey) {
+  try {
+    const baseUrl = PROVIDER_URLS[provider];
+    const providerRequest = buildProviderRequest(request, provider, modelId);
+    console.log(`[OmniLLM] Attempting ${provider}/${modelId}`);
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+        ...provider === "openrouter" ? { "HTTP-Referer": "http://localhost:8403", "X-Title": "OmniLLM" } : {}
+      },
+      body: JSON.stringify(providerRequest)
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      const isRateLimit = response.status === 429;
+      const isServerError = response.status >= 500;
+      console.error(`[OmniLLM] ${provider}/${modelId} failed (${response.status})${isRateLimit ? " [RATE LIMITED]" : ""}: ${errorText.substring(0, 200)}`);
+      if (isRateLimit || isServerError) {
+        return { success: false };
+      }
+      if (!res.headersSent) {
+        res.writeHead(response.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: `Provider error (${provider}): ${errorText}`,
+          provider,
+          model: modelId
+        }));
+      }
+      return { success: false };
+    }
+    const isStreaming = request.stream === true;
+    if (isStreaming && response.body) {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+      });
+      const reader = response.body.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+      } finally {
+        res.end();
+      }
+    } else {
+      const data = await response.text();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(data);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error(`[OmniLLM] Exception routing to ${provider}/${modelId}:`, error);
+    return { success: false };
+  }
+}
+function getFirstAvailableProvider() {
+  const priority = [
+    "opencode",
+    // Free models
+    "chutes",
+    // Cheaper/discounted models
+    "nvidia",
+    // Free tier
+    "openrouter",
+    // Free tier models
+    "openai",
+    "anthropic",
+    "google",
+    "xai",
+    "deepseek",
+    "moonshot"
+  ];
+  for (const provider of priority) {
+    const apiKey = getApiKey(provider);
+    if (apiKey) {
+      let modelId = "gpt-4o";
+      if (provider === "opencode") modelId = "big-pickle";
+      else if (provider === "chutes") modelId = "chutes/llama-3.1-70b";
+      else if (provider === "nvidia") modelId = "nvidia/llama-3.1-nemotron-70b-instruct";
+      else if (provider === "openrouter") modelId = "google/gemini-2.5-flash";
+      else if (provider === "anthropic") modelId = "claude-sonnet-4";
+      else if (provider === "google") modelId = "gemini-2.5-flash";
+      else if (provider === "xai") modelId = "grok-3";
+      else if (provider === "deepseek") modelId = "deepseek-v3";
+      else if (provider === "moonshot") modelId = "kimi-k2.5";
+      return { provider, modelId };
+    }
+  }
+  return null;
+}
 function resolveProvider(model) {
   if (model.startsWith("omni-llm/")) {
     model = model.replace("omni-llm/", "");
+  }
+  if (model === "auto" || model === "omni-llm/auto") {
+    return { provider: "opencode", modelId: "big-pickle" };
   }
   const resolvedModelId = resolveModelAlias(model);
   const modelInfo = getModel(resolvedModelId);
@@ -595,6 +775,10 @@ function resolveProvider(model) {
       };
     }
   }
+  const available = getFirstAvailableProvider();
+  if (available) {
+    return available;
+  }
   return { provider: "openrouter", modelId: resolvedModelId };
 }
 function getApiKey(provider) {
@@ -606,6 +790,36 @@ async function handleChatCompletions(req, res, body) {
     const request = JSON.parse(body);
     const model = request.model || "auto";
     console.log(`[OmniLLM] Request for model: ${model}`);
+    if (model === "auto" || model === "omni-llm/auto") {
+      const tier = classifyRequest(request);
+      const models = getAllModelsForTier(tier);
+      if (models.length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No providers available" }));
+        return;
+      }
+      console.log(`[OmniLLM] Smart routing: tier=${tier}, trying ${models.length} models`);
+      for (let i = 0; i < models.length; i++) {
+        const { provider: provider2, model: modelId2, isPaid } = models[i];
+        const apiKey2 = getApiKey(provider2);
+        if (!apiKey2) {
+          console.log(`[OmniLLM] Skipping ${provider2}/${modelId2} - no API key`);
+          continue;
+        }
+        console.log(`[OmniLLM] Attempt ${i + 1}/${models.length}: ${provider2}/${modelId2} (${isPaid ? "paid" : "free"})`);
+        const result = await routeToProviderWithFallback(req, res, request, provider2, modelId2, apiKey2);
+        if (result.success) {
+          console.log(`[OmniLLM] Success with ${provider2}/${modelId2}`);
+          return;
+        }
+        if (i === models.length - 1) {
+          console.log(`[OmniLLM] All ${models.length} models failed`);
+          return;
+        }
+        console.log(`[OmniLLM] ${provider2}/${modelId2} failed, rotating to next...`);
+      }
+      return;
+    }
     const resolved = resolveProvider(model);
     if (!resolved) {
       res.writeHead(400, { "Content-Type": "application/json" });
@@ -618,7 +832,8 @@ async function handleChatCompletions(req, res, body) {
       const openrouterKey = getApiKey("openrouter");
       if (openrouterKey && provider !== "openrouter") {
         console.log(`[OmniLLM] No API key for ${provider}, falling back to OpenRouter`);
-        return routeToOpenRouter(req, res, request, modelId, openrouterKey);
+        await routeToOpenRouter(req, res, request, modelId, openrouterKey);
+        return;
       }
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
@@ -731,9 +946,24 @@ function buildProviderRequest(request, provider, modelId) {
     temperature: request.temperature,
     max_tokens: request.max_tokens || request.maxTokens,
     top_p: request.top_p || request.topP,
-    stream: request.stream
+    stream: request.stream,
+    // Pass tools for tool calling support
+    ...request.tools && { tools: request.tools },
+    ...request.tool_choice && { tool_choice: request.tool_choice }
   };
   switch (provider) {
+    case "chutes":
+      return {
+        model: modelId,
+        messages: request.messages,
+        max_tokens: request.max_tokens || request.maxTokens || 4096,
+        temperature: request.temperature,
+        top_p: request.top_p || request.topP,
+        stream: request.stream,
+        // Pass tools for tool calling support
+        ...request.tools && { tools: request.tools },
+        ...request.tool_choice && { tool_choice: request.tool_choice }
+      };
     case "anthropic":
       return {
         model: modelId,
@@ -741,7 +971,10 @@ function buildProviderRequest(request, provider, modelId) {
         max_tokens: request.max_tokens || request.maxTokens || 4096,
         temperature: request.temperature,
         top_p: request.top_p || request.topP,
-        stream: request.stream
+        stream: request.stream,
+        // Pass tools for tool calling support
+        ...request.tools && { tools: request.tools },
+        ...request.tool_choice && { tool_choice: request.tool_choice }
       };
     case "google":
       return {
