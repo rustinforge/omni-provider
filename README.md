@@ -1,191 +1,8 @@
-# Omni-LLM for OpenClaw
+# OmniLLM
 
-A smart multi-provider LLM router plugin for OpenClaw. Automatically route requests to the best available model from 15+ providers including OpenAI, Anthropic, Google, xAI, DeepSeek, Chutes, and free models from OpenCode.
+Multi-provider LLM router for OpenClaw. Route requests to 15+ providers with automatic fallback and cost optimization.
 
 ## Quick Start
-
-```bash
-# Install the plugin
-openclaw plugins install https://github.com/rustinforge/omni-provider
-
-# Set environment variables
-export OPENCODE_API_KEY="your-opencode-key"
-export OPENAI_API_KEY="sk-your-key"
-export ANTHROPIC_API_KEY="sk-ant-your-key"
-
-# Use in OpenClaw
-openclaw models set omni-llm/auto
-```
-
-## Features
-
-- **Smart Auto-Routing** - Automatically picks the best model based on your request complexity
-- **Free Models First** - Prioritizes free tier from OpenCode, Chutes, and NVIDIA
-- **Intelligent Rotation** - Rotates between providers on rate limits or failures
-- **Cost Optimization** - Routes simple queries to free models, complex tasks to paid models
-- **15+ Providers** - OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot, OpenCode, Chutes, NVIDIA, Azure, and more
-
-## Supported Models
-
-| Command | Model | Provider | Price |
-|---------|-------|----------|-------|
-| `omni-llm/auto` | Auto-selected | Smart routing | Varies |
-| `omni-llm/sonnet` | Claude Sonnet 4 | Anthropic | $3/M |
-| `omni-llm/opus` | Claude Opus 4 | Anthropic | $15/M |
-| `omni-llm/gpt` | GPT-4o | OpenAI | $5/M |
-| `omni-llm/gpt-mini` | GPT-4o Mini | OpenAI | $0.15/M |
-| `omni-llm/flash` | Gemini 2.5 Flash | Google | $0.075/M |
-| `omni-llm/pro` | Gemini 2.5 Pro | Google | $1.25/M |
-| `omni-llm/big-pickle` | Big Pickle | OpenCode | **FREE** |
-| `omni-llm/gpt-nano` | GPT-5 Nano | OpenCode | **FREE** |
-| `omni-llm/kimi-free` | Kimi K2.5 Free | OpenCode | **FREE** |
-| `omni-llm/bossgirl` | Bossgirl | Chutes | **FREE** |
-| `omni-llm/glm5` | GLM-5 | Chutes/NVIDIA | **FREE** |
-| `omni-llm/deepseek` | DeepSeek V3 | DeepSeek | $0.27/M |
-| `omni-llm/grok` | Grok 3 | xAI | $5/M |
-| `omni-llm/nemotron` | Nemotron 70B | NVIDIA | **FREE** |
-
-## Installation
-
-### Prerequisites
-
-- Node.js 20+
-- OpenClaw 2026.2.14+
-
-### From Source
-
-```bash
-git clone https://github.com/rustinforge/omni-provider.git
-cd omni-provider
-npm install
-npm run build
-openclaw plugins install ./omni-provider
-```
-
-### Environment Variables
-
-Set these in your shell or systemd service:
-
-```bash
-# Free models (no API key needed)
-# Uses OpenCode, Chutes, and NVIDIA free tiers automatically
-
-# Free/discounted providers (API key required)
-export OPENCODE_API_KEY="your-opencode-key"    # Big Pickle, GPT-5 Nano, Kimi Free
-export CHUTES_API_KEY="your-chutes-key"        # Bossgirl, GLM-5, discounted models
-export NVIDIA_API_KEY="your-nvidia-key"        # Nemotron 70B, Mistral Large
-
-# Paid providers
-export OPENAI_API_KEY="sk-your-key"
-export ANTHROPIC_API_KEY="sk-ant-your-key"
-export GOOGLE_API_KEY="your-google-key"
-export XAI_API_KEY="your-xai-key"
-export DEEPSEEK_API_KEY="your-deepseek-key"
-export OPENROUTER_API_KEY="your-openrouter-key"
-export AZURE_OPENAI_API_KEY="your-azure-key"
-```
-
-## Usage
-
-### In OpenClaw Config
-
-Set `omni-llm/auto` as your primary model:
-
-```json
-{
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "omni-llm/auto"
-      },
-      "models": {
-        "omni-llm/auto": {"alias": "omni-auto"}
-      }
-    }
-  },
-  "plugins": {
-    "entries": {
-      "omni-llm": {"enabled": true}
-    }
-  }
-}
-```
-
-### Model Aliases
-
-Use short aliases for quick provider switching:
-
-```bash
-# Auto-routing (smart selection)
-omni-llm/auto
-
-# Claude models
-omni-llm/sonnet    # Claude Sonnet 4 (balanced)
-omni-llm/opus      # Claude Opus 4 (most capable)
-omni-llm/haiku     # Claude Haiku 4 (fast)
-
-# OpenAI models  
-omni-llm/gpt       # GPT-4o
-omni-llm/gpt-mini   # GPT-4o Mini (cheap)
-omni-llm/reasoner   # o3-mini (reasoning)
-
-# Google models
-omni-llm/flash     # Gemini 2.5 Flash (fast)
-omni-llm/pro       # Gemini 2.5 Pro (capable)
-
-# Free OpenCode models
-omni-llm/big-pickle  # Big Pickle (stealth model, free)
-omni-llm/gpt-nano    # GPT-5 Nano (free)
-omni-llm/kimi-free   # Kimi K2.5 Free
-
-# Other providers
-omni-llm/deepseek  # DeepSeek V3 (cheap)
-omni-llm/grok      # Grok 3 (xAI)
-omni-llm/kimi      # Kimi K2.5 (Moonshot)
-```
-
-## How It Works
-
-### Smart Routing Tiers
-
-The router classifies requests into tiers and rotates between available providers:
-
-- **simple** (< 200 chars) → OpenCode Big Pickle, OpenRouter auto, free models
-- **medium** (200-2000 chars) → Chutes GLM-5, Kimi K2.5, NVIDIA Nemotron
-- **complex** (> 2000 chars) → Chutes high-perf, Claude Sonnet, Gemini Pro, GPT-4o
-- **reasoning** (math/logic/code) → Chutes Kimi, DeepSeek R1, o3-mini, Claude Opus
-- **vision** (images) → Big Pickle, Gemini Flash, GPT-4o, Claude Sonnet
-
-### Provider Priority
-
-1. **Free models** - OpenCode (Big Pickle, GPT-5 Nano), Chutes (GLM-5, Bossgirl), NVIDIA (Nemotron)
-2. **Discounted providers** - Chutes (cheaper rates than direct)
-3. **Direct providers** - OpenAI, Anthropic, Google, xAI, DeepSeek
-4. **Meta-providers** - OpenRouter (fallback for all models)
-
-### Fallback Chain
-
-If a provider fails, automatically tries:
-```
-Free models → Direct providers → OpenRouter
-```
-
-## Plugin Commands
-
-When installed, these commands are available in OpenClaw:
-
-```bash
-# Show configured providers
-/providers
-
-# Show usage statistics
-/stats
-
-# View provider details
-openclaw plugins info omni-llm
-```
-
-## Development
 
 ```bash
 # Install dependencies
@@ -194,55 +11,166 @@ npm install
 # Build
 npm run build
 
-# Watch mode
-npm run dev
-
-# Run tests
-npm run test
-
-# Lint
-npm run lint
+# Test
+npm test
 ```
 
-## API Keys Required
+## Supported Providers
 
-| Provider | API Key | Cost |
-|----------|---------|------|
-| OpenCode | Optional | Many free models |
-| OpenAI | Required | Paid |
-| Anthropic | Required | Paid |
-| Google | Required | Paid |
-| xAI | Required | Paid |
-| DeepSeek | Required | Cheap |
-| Moonshot | Required | Moderate |
-| OpenRouter | Required | Varies |
-| Azure | Required | Enterprise |
+| Provider | Models | Key Required |
+|----------|--------|--------------|
+| **OpenCode** | Big Pickle, GPT-5 Nano, Kimi K2.5 Free | None (Free) |
+| **OpenAI** | GPT-4o, GPT-4o-mini, o3, o3-mini, GPT-5 | `OPENAI_API_KEY` |
+| **Anthropic** | Claude Sonnet, Opus, Haiku | `ANTHROPIC_API_KEY` |
+| **Google** | Gemini 2.5 Pro/Flash | `GOOGLE_API_KEY` |
+| **xAI** | Grok 3/4 Fast | `XAI_API_KEY` |
+| **DeepSeek** | V3, Chat, Reasoner | `DEEPSEEK_API_KEY` |
+| **Moonshot** | Kimi K2.5 | `MOONSHOT_API_KEY` |
+| **NVIDIA** | GLM-5, Nemotron 70B, Mistral Large | `NVIDIA_API_KEY` |
+| **Azure** | Azure OpenAI | `AZURE_OPENAI_*` |
+| **OpenRouter** | 200+ models | `OPENROUTER_API_KEY` |
+| **Anyscale, Together, Fireworks, Mistral, Cohere, Perplexity** | Various | Provider-specific |
 
-## Troubleshooting
+## Configuration
 
-**Plugin not loading?**
+### Environment Variables
+
 ```bash
-# Check if plugin is enabled
-openclaw plugins list
+# Free models (no key needed)
+# OpenCode automatically available
 
-# Verify environment variables are set
-env | grep API_KEY
-
-# Check logs
-journalctl -u openclaw -f
+# Paid providers
+export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
+export GOOGLE_API_KEY=...
+export XAI_API_KEY=...
+export DEEPSEEK_API_KEY=...
+export NVIDIA_API_KEY=nvapi-...
+export OPENROUTER_API_KEY=...
 ```
 
-**Model not found error?**
-Make sure you've added the model alias to your OpenClaw config:
+### OpenClaw Plugin Config
+
+Create `openclaw.plugin.json`:
+
 ```json
-"models": {
-  "omni-llm/auto": {"alias": "omni-auto"}
+{
+  "providers": {
+    "opencode": { "enabled": true, "priority": 10 },
+    "openai": { "enabled": true, "priority": 5 },
+    "anthropic": { "enabled": true, "priority": 4 },
+    "nvidia": { "enabled": true, "priority": 3 }
+  }
 }
 ```
 
-**Rate limited?**
-The plugin automatically falls back to other providers. Just retry your request.
+Priority determines fallback order (higher = tried first).
+
+## Usage
+
+### CLI with OpenClaw
+
+```bash
+# Auto-route to best available model
+openclaw models set omni-llm/auto
+
+# Use specific model aliases
+openclaw models set omni-llm/sonnet     # Claude Sonnet
+openclaw models set omni-llm/gpt        # GPT-4o
+openclaw models set omni-llm/big-pickle # Free OpenCode model
+openclaw models set omni-llm/glm5       # NVIDIA GLM-5
+```
+
+### Programmatic API
+
+```typescript
+import { LLMProviderManager } from 'omni-llm';
+
+const manager = new LLMProviderManager(api, config, apiKeys);
+await manager.registerAll();
+
+// Auto-routed request
+const response = await manager.complete({
+  model: 'omni-llm/auto',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+
+// Direct provider request
+const claude = await manager.complete({
+  model: 'claude-sonnet-4',
+  messages: [{ role: 'user', content: 'Write code' }],
+});
+```
+
+### Model Aliases
+
+| Alias | Resolves To | Provider |
+|-------|-------------|----------|
+| `auto` | Auto-selected | Any |
+| `sonnet` | claude-sonnet-4 | Anthropic |
+| `opus` | claude-opus-4 | Anthropic |
+| `gpt` | gpt-4o | OpenAI |
+| `gpt-mini` | gpt-4o-mini | OpenAI |
+| `reasoner` | o3-mini | OpenAI |
+| `grok` | grok-3 | xAI |
+| `kimi` | kimi-k2.5 | Moonshot |
+| `big-pickle` | big-pickle | OpenCode (Free) |
+| `glm5` | z-ai/glm5 | NVIDIA |
+| `nemotron` | nvidia/llama-3.1-nemotron-70b-instruct | NVIDIA |
+
+## Routing Logic
+
+1. **Explicit model** → Use specified provider
+2. **`auto` alias** → Evaluate request complexity
+3. **Free providers first** (OpenCode)
+4. **Direct providers** (OpenAI, Anthropic, etc.)
+5. **OpenRouter fallback**
+6. **On failure** → Try next in priority chain
+
+Request tier classification:
+- `simple` → Short queries, chat
+- `medium` → Code, explanations
+- `complex` → Analysis, writing
+- `reasoning` → Math, logic, o-series
+- `vision` → Image inputs
+
+## Development
+
+```bash
+npm run build      # Compile TypeScript
+npm run dev        # Watch mode
+npm run lint       # ESLint check
+npm run typecheck  # TypeScript check
+
+npm test           # All tests (349)
+npm run test:unit  # Unit tests only
+npm run test:e2e   # E2E tests
+npm run test:coverage
+```
+
+## Project Structure
+
+```
+src/
+├── index.ts           # Plugin entry
+├── core/
+│   └── manager.ts     # Provider management
+├── providers/         # 15 provider implementations
+│   ├── openai.ts
+│   ├── anthropic.ts
+│   ├── nvidia.ts      # NEW: NVIDIA NIM support
+│   └── ...
+├── router/
+│   └── smart-router.ts
+├── models.ts          # Model definitions
+└── types.ts
+
+tests/
+├── unit/              # Provider tests
+├── integration/       # Routing tests
+└── e2e/               # End-to-end tests
+```
 
 ## License
 
-MIT © 2026 Rustin Forge
+MIT
