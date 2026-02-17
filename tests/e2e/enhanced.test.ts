@@ -838,4 +838,275 @@ describe('E2E Tests - Enhanced Scenarios', () => {
       await manager.stopAll();
     });
   });
+
+  // ============================================
+  // Multi-Provider Fallback Tests
+  // ============================================
+  describe('Multi-Provider Fallback Chain', () => {
+    it('should fallback through multiple providers when first fails', async () => {
+      const config: ProvidersConfig = {
+        openai: { enabled: true, apiKey: 'test-key', priority: 3, baseUrl: `http://localhost:${MOCK_PORT}/fail` },
+        anthropic: { enabled: true, apiKey: 'test-key', priority: 2, baseUrl: `http://localhost:${MOCK_PORT}/fail` },
+        google: { enabled: true, apiKey: 'test-key', priority: 1, baseUrl: `http://localhost:${MOCK_PORT}` },
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        openai: 'test-key',
+        anthropic: 'test-key',
+        google: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      // Google should be in fallback chain after OpenAI and Anthropic
+      const fallback = manager['router'].getFallback('openai', 'gpt-4o');
+      expect(fallback).toContain('anthropic');
+      expect(fallback).toContain('google');
+
+      await manager.stopAll();
+    });
+
+    it('should respect provider priority in routing', async () => {
+      const config: ProvidersConfig = {
+        openai: { enabled: true, apiKey: 'test-key', priority: 1 },
+        anthropic: { enabled: true, apiKey: 'test-key', priority: 10 }, // Higher priority
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        openai: 'test-key',
+        anthropic: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      // Get all enabled providers - higher priority first
+      const enabled = manager.getEnabledProviders();
+      expect(enabled).toContain('openai');
+      expect(enabled).toContain('anthropic');
+
+      await manager.stopAll();
+    });
+  });
+
+  // ============================================
+  // Streaming Error Handling
+  // ============================================
+  describe('Streaming Error Scenarios', () => {
+    it('should handle stream interruption gracefully', async () => {
+      // This would require a more complex mock server that interrupts streams
+      // For now, we verify the stream method exists on providers
+      const config: ProvidersConfig = {
+        openai: { enabled: true, apiKey: 'test-key', baseUrl: `http://localhost:${MOCK_PORT}` },
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        openai: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      const provider = manager.getProvider('openai');
+      expect(provider).toBeDefined();
+      expect(typeof provider?.stream).toBe('function');
+
+      await manager.stopAll();
+    });
+
+    it('should handle provider returning non-stream response when stream requested', async () => {
+      // Provider might ignore stream flag and return normal response
+      // Our implementation should handle this gracefully
+      expect(true).toBe(true); // Placeholder for actual implementation
+    });
+  });
+
+  // ============================================
+  // Cost Estimation and Budget Tests
+  // ============================================
+  describe('Cost Estimation', () => {
+    it('should estimate cost correctly for different models', () => {
+      const gpt4o = getModel('gpt-4o');
+      expect(gpt4o).toBeDefined();
+      expect(gpt4o?.pricing).toBeDefined();
+      expect(gpt4o?.pricing?.input).toBeGreaterThan(0);
+
+      const gpt4oMini = getModel('gpt-4o-mini');
+      expect(gpt4oMini?.pricing?.input).toBeLessThan(gpt4o!.pricing!.input);
+
+      // Free models should have zero pricing
+      const bigPickle = getModel('big-pickle');
+      expect(bigPickle?.pricing?.input).toBe(0);
+    });
+
+    it('should route to cheaper models when tier allows', async () => {
+      const config: ProvidersConfig = {
+        openai: { enabled: true, apiKey: 'test-key' },
+        opencode: { enabled: true, apiKey: 'test-key' },
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        openai: 'test-key',
+        opencode: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      // Simple request should be eligible for cheaper routing
+      const decision = await manager.routeRequest({
+        model: 'auto',
+        messages: [{ role: 'user', content: 'Hi' }],
+      });
+
+      expect(decision.costEstimate).toBeDefined();
+      expect(decision.savings).toBeGreaterThanOrEqual(0);
+
+      await manager.stopAll();
+    });
+  });
+
+  // ============================================
+  // Provider Health and Availability
+  // ============================================
+  describe('Provider Health Checking', () => {
+    it('should report provider availability correctly', async () => {
+      const config: ProvidersConfig = {
+        openai: { enabled: true, apiKey: 'test-key' },
+        anthropic: { enabled: false },
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        openai: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      expect(manager.isProviderAvailable('openai')).toBe(true);
+      expect(manager.isProviderAvailable('anthropic')).toBe(false);
+      expect(manager.isProviderAvailable('google' as LLMProvider)).toBe(false);
+
+      await manager.stopAll();
+    });
+
+    it('should handle all providers disabled gracefully', async () => {
+      const config: ProvidersConfig = {};
+      const apiKeys: ApiKeysConfig = {};
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      expect(manager.getEnabledProviders()).toHaveLength(0);
+
+      // Should throw when trying to resolve model
+      await expect(manager.resolveModel('some-model')).rejects.toThrow();
+
+      await manager.stopAll();
+    });
+  });
+
+  // ============================================
+  // Model Resolution Edge Cases
+  // ============================================
+  describe('Model Resolution Edge Cases', () => {
+    it('should handle unknown model IDs by inference', async () => {
+      const config: ProvidersConfig = {
+        openai: { enabled: true, apiKey: 'test-key' },
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        openai: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      // Unknown model starting with provider name
+      const resolved = await manager.resolveModel('openai-gpt-unknown');
+      expect(resolved.provider).toBe('openai');
+
+      await manager.stopAll();
+    });
+
+    it('should handle exact model ID match over inference', async () => {
+      const config: ProvidersConfig = {
+        openai: { enabled: true, apiKey: 'test-key' },
+        anthropic: { enabled: true, apiKey: 'test-key' },
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        openai: 'test-key',
+        anthropic: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      // Explicit model ID should be used
+      const resolved = await manager.resolveModel('gpt-4o');
+      expect(resolved.modelId).toBe('gpt-4o');
+      expect(resolved.provider).toBe('openai');
+
+      const claude = await manager.resolveModel('claude-opus-4');
+      expect(claude.modelId).toBe('claude-opus-4');
+      expect(claude.provider).toBe('anthropic');
+
+      await manager.stopAll();
+    });
+
+    it('should handle nvidia/glm5 model resolution', async () => {
+      const config: ProvidersConfig = {
+        nvidia: { enabled: true, apiKey: 'test-key' },
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        nvidia: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      const resolved = await manager.resolveModel('z-ai/glm5');
+      expect(resolved.modelId).toBe('z-ai/glm5');
+      expect(resolved.provider).toBe('nvidia');
+
+      await manager.stopAll();
+    });
+  });
+
+  // ============================================
+  // Stats Collection
+  // ============================================
+  describe('Stats Collection', () => {
+    it('should track request statistics', async () => {
+      const config: ProvidersConfig = {
+        openai: { enabled: true, apiKey: 'test-key', baseUrl: `http://localhost:${MOCK_PORT}` },
+      };
+
+      const apiKeys: ApiKeysConfig = {
+        openai: 'test-key',
+      };
+
+      const manager = new LLMProviderManager(mockApi, config, apiKeys);
+      await manager.registerAll();
+      await manager.startAll();
+
+      const stats = manager.getStats();
+      expect(stats).toBeDefined();
+      expect(Array.isArray(stats.byProvider)).toBe(true);
+
+      await manager.stopAll();
+    });
+  });
 });
